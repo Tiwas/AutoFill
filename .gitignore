@@ -2,6 +2,7 @@
 backups/
 tmp/
 scripts/
+archive/
 
 # Node artifacts
 node_modules/
@@ -12,3 +13,8 @@ yarn-error.log*
 # OS junk
 .DS_Store
 Thumbs.db
+
+ROADMAP.md
+ROBOTS.md
+SESSION.md
+pattern-matcher.js

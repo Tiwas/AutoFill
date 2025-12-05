@@ -16,7 +16,6 @@ let selectedRules = new Set();
 let currentSort = 'order';
 let availableFields = [];
 let draggingRuleId = null;
-let currentLanguage = 'en'; // Standard engelsk
 let cloudConfig = {};
 let importPreviewState = null;
 let logEnabled = false;
@@ -33,7 +32,7 @@ const elements = {};
  * Appliser oversettelser til UI
  */
 function applyTranslations() {
-  const t = translations[currentLanguage] || translations.en || {};
+  const t = translations.current || translations.en || {};
   const tEn = translations.en || {};
   const setText = (id, value) => {
     if (!value) return;
@@ -437,7 +436,7 @@ function toggleAdvancedSettingsPanel() {
 }
 
 function updateAdvancedToggleLabel() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   if (!elements.toggleAdvancedSettings) return;
   const collapsed = elements.advancedSettings?.classList.contains('collapsed');
   elements.toggleAdvancedSettings.dataset.collapsed = collapsed ? 'true' : 'false';
@@ -553,10 +552,6 @@ function attachEventListeners() {
   if (elements.fieldBlacklistPatterns) elements.fieldBlacklistPatterns.addEventListener('change', handleListChange);
   if (elements.whitelistPatterns) elements.whitelistPatterns.addEventListener('change', handleListChange);
   
-  // FIX: Sjekk om elementet finnes før vi legger til listener
-  if (elements.languageSelect) {
-    elements.languageSelect.addEventListener('change', handleLanguageChange);
-  }
   if (elements.logToFileToggle) {
     elements.logToFileToggle.addEventListener('change', handleLogToggle);
   }
@@ -627,25 +622,15 @@ async function loadSettings() {
   if (elements.fieldBlacklistPatterns) {
     elements.fieldBlacklistPatterns.value = Array.isArray(result.fieldBlacklist) ? result.fieldBlacklist.join('\n') : '';
   }
-  if (elements.whitelistPatterns) {
-    elements.whitelistPatterns.value = Array.isArray(result.whitelist) ? result.whitelist.join('\n') : '';
-  }
-    
-    // Last inn språk eller behold default
-    if (result.language) {
-      currentLanguage = result.language;
+      if (elements.whitelistPatterns) {
+      elements.whitelistPatterns.value = Array.isArray(result.whitelist) ? result.whitelist.join('\n') : '';
     }
-    // VIKTIG: Synkroniser dropdown VISUELT med variabelen (både ved first-load og lagret load)
-    if (elements.languageSelect) {
-      elements.languageSelect.value = currentLanguage;
+      
+    } catch (error) {
+      console.error('Error loading settings:', error);
     }
-
-  } catch (error) {
-    console.error('Error loading settings:', error);
   }
-}
-
-async function loadCurrentProfileId() {
+  async function loadCurrentProfileId() {
   try {
     const res = await chrome.storage.local.get('currentProfileId');
     if (res.currentProfileId) {
@@ -707,7 +692,7 @@ async function handleAutofillToggle(e) {
     }
     
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error updating autofill:', error);
@@ -738,7 +723,7 @@ async function handleDebugToggle(e) {
     }
     
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error updating debug:', error);
@@ -769,7 +754,7 @@ async function handleScanToastToggle(e) {
     }
 
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error updating scan toast:', error);
@@ -788,7 +773,7 @@ async function handleAutofillDelayChange(e) {
     broadcastSettings({ autofillDelay: delay });
     
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error saving delay:', error);
@@ -805,7 +790,7 @@ async function handleAutofillModeChange(e) {
     broadcastSettings({ autofillTrigger: mode });
     
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error saving mode:', error);
@@ -835,25 +820,10 @@ async function handleListChange() {
     broadcastSettings({ blacklist, whitelist, fieldBlacklist });
     
     // Vis toast
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error saving lists:', error);
-  }
-}
-
-async function handleLanguageChange(e) {
-  const lang = e.target.value;
-  try {
-    await chrome.storage.local.set({ language: lang });
-    currentLanguage = lang;
-    applyTranslations();
-    
-    // Vis toast
-    const t = translations[currentLanguage] || translations.en;
-    showToast(t.toast.saved);
-  } catch (error) {
-    console.error('Error saving language:', error);
   }
 }
 
@@ -884,7 +854,7 @@ async function handleBulkMoveSubmit(e) {
     if (!targetProfileId) return;
     
     const ruleIds = Array.from(selectedRules);
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     
     // Get profile name for toast
     const profiles = await Storage.getProfiles();
@@ -927,13 +897,13 @@ async function loadVariables() {
 }
 
 function getBuiltInVariables() {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     return Array.isArray(t.variables?.builtins) ? t.variables.builtins : [];
 }
 
 function renderVariables() {
     elements.variablesList.innerHTML = '';
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     const builtins = getBuiltInVariables();
     const emptyText = t.variables?.empty || 'No variables defined.';
 
@@ -998,13 +968,13 @@ async function handleAddVariable(e) {
         renderVariables();
         document.getElementById('addVariableForm').reset();
     } catch (e) {
-        const t = translations[currentLanguage] || translations.en;
+        const t = translations.current || translations.en;
         alert(t.variables?.saveError || 'Could not save variable');
     }
 }
 
 async function handleDeleteVariable(key) {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     if(!confirm(t.variables?.confirmDelete?.replace('{name}', key) || `Delete variable {${key}}?`)) return;
     
     delete userVariables[key];
@@ -1036,7 +1006,7 @@ async function loadProfiles() {
 function renderProfileSelector(profiles) {
     if (!elements.profileSelect) return;
     
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     elements.profileSelect.innerHTML = '';
     
     // Option for "All profiles" could be added here if desired, but for now strictly per profile
@@ -1055,7 +1025,7 @@ function renderProfilesList(profiles) {
     if (!elements.profilesList) return;
     elements.profilesList.innerHTML = '';
     
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
 
     for (const p of profiles) {
         const div = document.createElement('div');
@@ -1122,7 +1092,7 @@ async function handleAddProfile(e) {
 }
 
 async function handleDeleteProfile(id, name) {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     
     if (id === 'default') {
         alert(t.profiles.cannotDeleteDefault);
@@ -1596,7 +1566,7 @@ function renderRules() {
 
   // Render partial matches i eget panel hvis de finnes
   if (sortedPartialMatches.length > 0) {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     const partialMatchesSection = document.createElement('div');
     partialMatchesSection.className = 'partial-matches-section';
     partialMatchesSection.innerHTML = `
@@ -1688,7 +1658,7 @@ function sortRules(rules, sortBy) {
 function createRuleElement(rule, isPartial = false, isConflict = false, conflictWinners = new Map()) {
   const div = document.createElement('div');
   const isDragEnabled = !selectMode && currentSort === 'order';
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   const labels = t.ruleLabels || {};
   const actions = t.ruleActions || {};
 
@@ -1721,8 +1691,8 @@ function createRuleElement(rule, isPartial = false, isConflict = false, conflict
     ].join('|');
     const winnerId = conflictWinners.get(key);
     const isWinner = winnerId === rule.id;
-    const conflictLabel = (translations[currentLanguage]?.conflict) || 'Conflict';
-    const conflictWinner = (translations[currentLanguage]?.conflictWinner) || 'winner';
+    const conflictLabel = (translations.current?.conflict) || 'Conflict';
+    const conflictWinner = (translations.current?.conflictWinner) || 'winner';
     badges.push(`<span class="rule-badge badge-conflict">${escapeHtml(conflictLabel)}${isWinner ? ` (${escapeHtml(conflictWinner)})` : ''}</span>`);
   }
 
@@ -1855,7 +1825,7 @@ function enterSelectMode() {
   selectMode = true;
   selectedRules.clear();
   if (elements.selectModeBtn) {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     elements.selectModeBtn.textContent = t.buttons?.bulkCancel || 'Cancel';
     elements.selectModeBtn.classList.add('active');
   }
@@ -1870,7 +1840,7 @@ function exitSelectMode() {
   selectMode = false;
   selectedRules.clear();
   if (elements.selectModeBtn) {
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     elements.selectModeBtn.textContent = t.buttons?.selectModeBtn || 'Select multiple';
     elements.selectModeBtn.classList.remove('active');
   }
@@ -2057,7 +2027,7 @@ function hideOptimizer() {
 function renderOptimizerStats(report) {
   const el = document.getElementById('optimizerStats');
   if (!el) return;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   const stats = report;
   el.innerHTML = `
@@ -2076,7 +2046,7 @@ function renderOptimizerStats(report) {
  */
 function renderSuggestions(suggestions) {
   elements.suggestionsList.innerHTML = '';
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   if (suggestions.length === 0) {
     elements.suggestionsList.innerHTML = `
@@ -2100,7 +2070,7 @@ function renderSuggestions(suggestions) {
 function createSuggestionElement(suggestion) {
   const div = document.createElement('div');
   div.className = `suggestion-item priority-${suggestion.priority}`;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   div.innerHTML = `
     <div class="suggestion-header">
@@ -2243,7 +2213,7 @@ function updateStats() {
  */
 function openEditModal(ruleId = null) {
   editingRuleId = ruleId;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   // Populate profile select
   if (elements.ruleProfileSelect) {
@@ -2336,7 +2306,7 @@ function handleFieldTypeChange() {
  */
 async function handleSaveRule(e) {
   e.preventDefault();
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   const ruleData = {
     sitePattern: document.getElementById('sitePattern').value.trim(),
@@ -2449,7 +2419,7 @@ async function handleSaveRule(e) {
  * Håndter sletting av regel
  */
 async function handleDeleteRule(ruleId) {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   if (!confirm(t.alerts.confirmDeleteRule)) {
     return;
   }
@@ -2476,7 +2446,7 @@ async function handleDeleteRule(ruleId) {
  */
 async function handleExport() {
   showLoading(true);
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   try {
     let rulesToExport = allRules;
@@ -2511,7 +2481,7 @@ async function handleExport() {
 async function handleImport(e, mode = 'import') {
   const file = e?.target?.files?.[0];
   if (!file) return;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   if (e?.target) e.target.value = '';
 
@@ -2547,7 +2517,7 @@ async function handleLogToggle(e) {
     logEnabled = enabled;
     await chrome.storage.local.set({ logToFile: enabled });
     await appendLog('log_toggle', { enabled });
-    const t = translations[currentLanguage] || translations.en;
+    const t = translations.current || translations.en;
     showToast(t.toast.saved);
   } catch (error) {
     console.error('Error updating log setting:', error);
@@ -2660,7 +2630,7 @@ function buildCsvFromAnalysis(analysis, opts = {}) {
 }
 
 function showImportPreviewModal(analysis, mode = 'import', tOverride) {
-  const t = tOverride || translations[currentLanguage] || translations.en;
+  const t = tOverride || translations.current || translations.en;
   importPreviewState = { analysis, mode };
   if (elements.importPreviewModal) elements.importPreviewModal.style.display = 'flex';
 
@@ -2696,7 +2666,7 @@ function closeImportPreviewModal() {
 
 async function confirmImportPreview() {
   if (!importPreviewState) return;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   const skipDuplicates = elements.skipDuplicatesToggle ? elements.skipDuplicatesToggle.checked : true;
   const skipInvalid = elements.skipInvalidToggle ? elements.skipInvalidToggle.checked : true;
@@ -2732,7 +2702,7 @@ async function confirmImportPreview() {
 }
 
 async function handleCloudBackup() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   const providerLabel = t.cloud?.title || 'Backup';
 
   showLoading(true);
@@ -2761,7 +2731,7 @@ async function handleCloudBackup() {
 
 async function handleCloudLogin() {
   // Legacy button now just informs user that no login is needed for local backups.
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   alert(t.cloud.noLoginNeeded || 'Login not required for local backup.');
 }
 
@@ -2776,7 +2746,7 @@ async function openCloudRestoreFlow() {
 }
 
 async function refreshCloudBackups() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   alert(t.cloud.noBackups || 'No backups listed. Use Restore to pick a CSV file.');
 }
 
@@ -2933,7 +2903,7 @@ async function appendLog(event, data) {
 }
 
 async function handleExportLog() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   try {
     const res = await chrome.storage.local.get(LOG_KEY);
     const buffer = Array.isArray(res[LOG_KEY]) ? res[LOG_KEY] : logBuffer;
@@ -3016,7 +2986,7 @@ function buildImportPreview(content, existingRules, t) {
  * Få label for element type
  */
 function getElementTypeLabel(type) {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   return t.elementTypes[type] || type;
 }
 
@@ -3024,7 +2994,7 @@ function getElementTypeLabel(type) {
  * Få label for site match type
  */
 function getSiteMatchTypeLabel(type) {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   return t.matchTypes[type] || type;
 }
 
@@ -3068,7 +3038,7 @@ function formatDate(timestamp) {
  * Test match på aktiv side (uten å fylle ut)
  */
 async function handleTestMatch() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   try {
     const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'testMatches', profileId: currentProfileId });
     if (!response || !response.success) {
@@ -3103,7 +3073,7 @@ function copyAiPrompt() {
 }
 
 function generateAiPrompt() {
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   const header = [
     'You are an expert at generating autofill rules for a browser extension.',
     'Return only CSV lines with these columns (semicolon-separated):',
@@ -3200,7 +3170,7 @@ function renderAvailableFields() {
 
 async function handleForceFill() {
   if (!currentTab) return;
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
 
   showLoading(true);
   try {
@@ -3225,7 +3195,7 @@ async function handleTestMatch() {
     return;
   }
 
-  const t = translations[currentLanguage] || translations.en;
+  const t = translations.current || translations.en;
   showLoading(true);
 
   try {
@@ -3269,4 +3239,5 @@ async function handleTestMatch() {
     showLoading(false);
   }
 }
+
 

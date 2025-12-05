@@ -1,0 +1,1218 @@
+{
+  "buttons_openFullViewBtn": {
+    "message": "Åpne full visning",
+    "description": ""
+  },
+  "buttons_exportBtn": {
+    "message": "Eksporter",
+    "description": ""
+  },
+  "buttons_importBtn": {
+    "message": "Importer",
+    "description": ""
+  },
+  "buttons_validateBtn": {
+    "message": "Valider",
+    "description": ""
+  },
+  "buttons_exportLog": {
+    "message": "Eksporter logg",
+    "description": ""
+  },
+  "buttons_testMatchBtn": {
+    "message": "Test match",
+    "description": ""
+  },
+  "buttons_aiAssistBtn": {
+    "message": "AI assist",
+    "description": ""
+  },
+  "buttons_optimizeBtn": {
+    "message": "Optimaliser",
+    "description": ""
+  },
+  "buttons_variablesBtn": {
+    "message": "Variabler",
+    "description": ""
+  },
+  "buttons_selectModeBtn": {
+    "message": "Velg flere",
+    "description": ""
+  },
+  "buttons_addRuleBtn": {
+    "message": "+ Ny regel",
+    "description": ""
+  },
+  "buttons_bulkEnable": {
+    "message": "Aktiver",
+    "description": ""
+  },
+  "buttons_bulkDisable": {
+    "message": "Deaktiver",
+    "description": ""
+  },
+  "buttons_bulkDelete": {
+    "message": "Slett",
+    "description": ""
+  },
+  "buttons_bulkMove": {
+    "message": "Flytt til...",
+    "description": ""
+  },
+  "buttons_bulkCancel": {
+    "message": "Avbryt",
+    "description": ""
+  },
+  "buttons_pushSyncBtn": {
+    "message": "Push",
+    "description": ""
+  },
+  "buttons_pullSyncBtn": {
+    "message": "Pull",
+    "description": ""
+  },
+  "buttons_copyAiPrompt": {
+    "message": "Kopier",
+    "description": ""
+  },
+  "buttons_regenerateAiPrompt": {
+    "message": "Oppdater",
+    "description": ""
+  },
+  "buttons_save": {
+    "message": "Lagre",
+    "description": ""
+  },
+  "buttons_cancel": {
+    "message": "Avbryt",
+    "description": ""
+  },
+  "placeholders_searchInput": {
+    "message": "Søk etter regler...",
+    "description": ""
+  },
+  "placeholders_availableSearch": {
+    "message": "Søk i felter...",
+    "description": ""
+  },
+  "placeholders_sitePattern": {
+    "message": "example.com eller *.example.com",
+    "description": ""
+  },
+  "placeholders_fieldPattern": {
+    "message": "username eller user*",
+    "description": ""
+  },
+  "placeholders_value": {
+    "message": "Verdien som skal fylles inn",
+    "description": ""
+  },
+  "placeholders_comment": {
+    "message": "Valgfri kommentar for regelen",
+    "description": ""
+  },
+  "statLabels": {
+    "message": "Totalt:\nAktive:\nDenne siden:",
+    "description": ""
+  },
+  "available_title": {
+    "message": "Tilgjengelige felter",
+    "description": ""
+  },
+  "available_subtitle": {
+    "message": "Basert på feltene som finnes på aktiv fane",
+    "description": ""
+  },
+  "available_empty": {
+    "message": "Kunne ikke finne felter. Åpne en side med skjema for å se forslag.",
+    "description": ""
+  },
+  "rulesHeader": {
+    "message": "Regler",
+    "description": ""
+  },
+  "appTitle": {
+    "message": "AutoFill",
+    "description": ""
+  },
+  "contextMenu_addField": {
+    "message": "Legg til dette feltet i AutoFill",
+    "description": ""
+  },
+  "contextMenu_addAll": {
+    "message": "Legg til alle utfylte felt",
+    "description": ""
+  },
+  "contextMenu_fillAs": {
+    "message": "Fyll ut som...",
+    "description": ""
+  },
+  "contextMenu_setActive": {
+    "message": "Sett aktiv profil",
+    "description": ""
+  },
+  "headings_optimizer": {
+    "message": "Optimaliseringsforslag",
+    "description": ""
+  },
+  "headings_llmSection": {
+    "message": "LLM-assistert optimalisering",
+    "description": ""
+  },
+  "headings_llmSectionDesc": {
+    "message": "Bruk en LLM (ChatGPT, Claude, etc.) til å kombinere og optimalisere reglene dine.",
+    "description": ""
+  },
+  "headings_llmPromptLabel": {
+    "message": "LLM Prompt (kopier til ChatGPT/Claude):",
+    "description": ""
+  },
+  "headings_llmExportLabel": {
+    "message": "Eksporterte regler (semikolonseparert):",
+    "description": ""
+  },
+  "headings_llmImportLabel": {
+    "message": "Lim inn optimaliserte regler fra LLM:",
+    "description": ""
+  },
+  "headings_blacklistTitle": {
+    "message": "Blacklist / Whitelist",
+    "description": ""
+  },
+  "headings_settingsTitle": {
+    "message": "Innstillinger & Variabler",
+    "description": ""
+  },
+  "headings_variablesUsage": {
+    "message": "Variabler du kan bruke i verdi-feltet:",
+    "description": ""
+  },
+  "copy_regexHelpTitle": {
+    "message": "Regex-hjelp",
+    "description": ""
+  },
+  "copy_regexHelp": {
+    "message": "Regular expressions (regex) gir kraftig mønstermatching:\n\nEksempler:\n• ^user - matcher felt som starter med \"user\"\n• name$ - matcher felt som slutter med \"name\"\n• (first|last)_name - matcher \"first_name\" eller \"last_name\"\n• user.* - matcher \"user\" etterfulgt av hva som helst\n• \\d{3} - matcher nøyaktig 3 sifre\n\nVanlige mønstre:\n• . = hvilket som helst tegn\n• * = null eller flere av forrige\n• + = en eller flere av forrige\n• ? = null eller én av forrige\n• [abc] = ett av a, b eller c\n• [0-9] = et siffer\n• \\w = ordtegn (bokstav, siffer, underscore)\n• \\d = siffer\n• ^ = start på streng\n• $ = slutt på streng\n\nBruk wildcards hvis du ikke trenger regex:\n• * = matcher alt\n• ? = matcher ett tegn",
+    "description": ""
+  },
+  "pageRules_header": {
+    "message": "Regler for denne siden",
+    "description": ""
+  },
+  "pageRules_forceFill": {
+    "message": "Tving utfylling nå",
+    "description": ""
+  },
+  "pageRules_forceFillTitle": {
+    "message": "Fyll felter selv om de allerede har verdier",
+    "description": ""
+  },
+  "pageRules_empty": {
+    "message": "Ingen regler matcher denne siden",
+    "description": ""
+  },
+  "pageRules_hint": {
+    "message": "Åpne full visning for å legge til eller redigere regler.",
+    "description": ""
+  },
+  "pageRules_apply": {
+    "message": "Bruk matcher",
+    "description": ""
+  },
+  "pageRules_partialHeader": {
+    "message": "Delvis match (domene matcher, men ingen felter funnet)",
+    "description": ""
+  },
+  "ruleLabels_element": {
+    "message": "Element",
+    "description": ""
+  },
+  "ruleLabels_field": {
+    "message": "Felt",
+    "description": ""
+  },
+  "ruleLabels_value": {
+    "message": "Verdi",
+    "description": ""
+  },
+  "ruleLabels_priority": {
+    "message": "Prioritet",
+    "description": ""
+  },
+  "ruleLabels_condition": {
+    "message": "Betingelse",
+    "description": ""
+  },
+  "ruleLabels_site": {
+    "message": "Nettsted",
+    "description": ""
+  },
+  "ruleLabels_lastUsed": {
+    "message": "Sist brukt",
+    "description": ""
+  },
+  "ruleLabels_profile": {
+    "message": "Profil",
+    "description": ""
+  },
+  "ruleLabels_enabled": {
+    "message": "Regel aktiv",
+    "description": ""
+  },
+  "ruleActions_edit": {
+    "message": "Rediger",
+    "description": ""
+  },
+  "ruleActions_delete": {
+    "message": "Slett",
+    "description": ""
+  },
+  "rulesPage_title": {
+    "message": "AutoFill Regler",
+    "description": ""
+  },
+  "rulesPage_subtitle": {
+    "message": "Administrer, grupper og optimaliser alle reglene.",
+    "description": ""
+  },
+  "rulesPage_eyebrow": {
+    "message": "Full visning",
+    "description": ""
+  },
+  "rulesPage_actions_refresh": {
+    "message": "Oppdater",
+    "description": ""
+  },
+  "rulesPage_actions_exportSelected": {
+    "message": "Eksporter valgte",
+    "description": ""
+  },
+  "rulesPage_actions_import": {
+    "message": "Importer",
+    "description": ""
+  },
+  "rulesPage_actions_restore": {
+    "message": "Gjenopprett backup",
+    "description": ""
+  },
+  "rulesPage_actions_backup": {
+    "message": "Backup",
+    "description": ""
+  },
+  "rulesPage_actions_mergeFiltered": {
+    "message": "Slå sammen filter",
+    "description": ""
+  },
+  "rulesPage_actions_openPopup": {
+    "message": "Åpne popup",
+    "description": ""
+  },
+  "rulesPage_search_regex": {
+    "message": "Regex",
+    "description": ""
+  },
+  "rulesPage_search_fields": {
+    "message": "Match felter",
+    "description": ""
+  },
+  "rulesPage_search_values": {
+    "message": "Match verdier",
+    "description": ""
+  },
+  "rulesPage_search_modeLabel": {
+    "message": "Match-modus:",
+    "description": ""
+  },
+  "rulesPage_search_modes_strict": {
+    "message": "Strict (^pattern$)",
+    "description": ""
+  },
+  "rulesPage_search_modes_loose": {
+    "message": "Loose (.*pattern.*)",
+    "description": ""
+  },
+  "rulesPage_controls_selectAll": {
+    "message": "Velg alle",
+    "description": ""
+  },
+  "rulesPage_controls_searchPlaceholder": {
+    "message": "Søk i regler...",
+    "description": ""
+  },
+  "rulesPage_controls_groupBySite": {
+    "message": "Grupper per nettsted",
+    "description": ""
+  },
+  "rulesPage_controls_enabledOnly": {
+    "message": "Kun aktive",
+    "description": ""
+  },
+  "rulesPage_controls_regexOnly": {
+    "message": "Kun regex",
+    "description": ""
+  },
+  "rulesPage_controls_sortLabel": {
+    "message": "Sorter:",
+    "description": ""
+  },
+  "rulesPage_controls_activeProfile": {
+    "message": "Aktiv profil:",
+    "description": ""
+  },
+  "rulesPage_summary_total": {
+    "message": "Totalt",
+    "description": ""
+  },
+  "rulesPage_summary_active": {
+    "message": "Aktive",
+    "description": ""
+  },
+  "rulesPage_summary_regex": {
+    "message": "Regex",
+    "description": ""
+  },
+  "rulesPage_summary_selected": {
+    "message": "Valgte",
+    "description": ""
+  },
+  "rulesPage_settingsTitle": {
+    "message": "Innstillinger & Variabler",
+    "description": ""
+  },
+  "rulesPage_empty_loading": {
+    "message": "Laster regler...",
+    "description": ""
+  },
+  "rulesPage_empty_none": {
+    "message": "Ingen regler funnet",
+    "description": ""
+  },
+  "rulesPage_blacklist_title": {
+    "message": "Blacklist / Whitelist",
+    "description": ""
+  },
+  "rulesPage_blacklist_subtitle": {
+    "message": "Nettsteder som skal ignoreres (Blacklist).",
+    "description": ""
+  },
+  "rulesPage_blacklist_label": {
+    "message": "Blacklist (ett mønster per linje):",
+    "description": ""
+  },
+  "rulesPage_blacklist_placeholder": {
+    "message": "*.bank.no",
+    "description": ""
+  },
+  "rulesPage_blacklist_save": {
+    "message": "Lagre blacklist",
+    "description": ""
+  },
+  "rulesPage_notifications_label": {
+    "message": "Vis varsel på skjermen ved utfylling",
+    "description": ""
+  },
+  "rulesPage_variables_heading": {
+    "message": "Variabler du kan bruke i verdi-feltet:",
+    "description": ""
+  },
+  "emptyRules": {
+    "message": "Ingen regler funnet",
+    "description": ""
+  },
+  "emptyHint": {
+    "message": "Høyreklikk på et felt på en webside for å legge til en regel",
+    "description": ""
+  },
+  "modalTitleNew": {
+    "message": "Ny regel",
+    "description": ""
+  },
+  "modalTitleEdit": {
+    "message": "Rediger regel",
+    "description": ""
+  },
+  "modalLabels_sitePattern": {
+    "message": "Nettstedsmønster",
+    "description": ""
+  },
+  "modalLabels_siteMatchType": {
+    "message": "Matching-type",
+    "description": ""
+  },
+  "modalLabels_elementType": {
+    "message": "Elementtype",
+    "description": ""
+  },
+  "modalLabels_fieldType": {
+    "message": "Identifikatortype",
+    "description": ""
+  },
+  "modalLabels_fieldPattern": {
+    "message": "Feltmønster",
+    "description": ""
+  },
+  "modalLabels_value": {
+    "message": "Verdi",
+    "description": ""
+  },
+  "modalLabels_comment": {
+    "message": "Kommentar",
+    "description": ""
+  },
+  "modalLabels_conditionType": {
+    "message": "Betingelse",
+    "description": ""
+  },
+  "modalLabels_priority": {
+    "message": "Prioritet",
+    "description": ""
+  },
+  "modalHints_site": {
+    "message": "Bruk * for wildcard, ? for enkelt tegn",
+    "description": ""
+  },
+  "modalHints_elementType": {
+    "message": "Type HTML-element regelen gjelder for",
+    "description": ""
+  },
+  "modalHints_fieldType": {
+    "message": "Hvordan feltet identifiseres",
+    "description": ""
+  },
+  "modalHints_value": {
+    "message": "For checkbox/radio: \"true\" eller \"false\". For select: tekst eller value.",
+    "description": ""
+  },
+  "modalHints_regex": {
+    "message": "Bruk JavaScript regex (uten /). Eksempel: ^user.*",
+    "description": ""
+  },
+  "settings_language_label": {
+    "message": "Språk",
+    "description": ""
+  },
+  "settings_language_desc": {
+    "message": "Velg språk for UI",
+    "description": ""
+  },
+  "settings_autofillOn_label": {
+    "message": "AutoFill Aktivert",
+    "description": ""
+  },
+  "settings_autofillOn_desc": {
+    "message": "Slå på/av automatisk utfylling globalt",
+    "description": ""
+  },
+  "settings_debug_label": {
+    "message": "Debug-modus",
+    "description": ""
+  },
+  "settings_debug_desc": {
+    "message": "Vis detaljert logging og visuell feedback",
+    "description": ""
+  },
+  "settings_logToFile_label": {
+    "message": "Lokal debuglogg",
+    "description": ""
+  },
+  "settings_logToFile_desc": {
+    "message": "Lagre debuglogg lokalt; eksporter ved behov",
+    "description": ""
+  },
+  "settings_delay_label": {
+    "message": "Autofill delay (ms)",
+    "description": ""
+  },
+  "settings_delay_desc": {
+    "message": "Forsink utfylling for trege sider",
+    "description": ""
+  },
+  "settings_mode_label": {
+    "message": "Autofill modus",
+    "description": ""
+  },
+  "settings_mode_desc": {
+    "message": "Auto ved last eller kun etter interaksjon",
+    "description": ""
+  },
+  "settings_whitelist_label": {
+    "message": "Whitelist",
+    "description": ""
+  },
+  "settings_whitelist_desc": {
+    "message": "Et mønster per linje. Tom = alle tillatt.",
+    "description": ""
+  },
+  "settings_blacklist_label": {
+    "message": "Blacklist",
+    "description": ""
+  },
+  "settings_blacklist_desc": {
+    "message": "Overstyrer whitelist. Et mønster per linje.",
+    "description": ""
+  },
+  "settings_fieldBlacklist_label": {
+    "message": "Ignorerte Felt (ID)",
+    "description": ""
+  },
+  "settings_fieldBlacklist_desc": {
+    "message": "Unngå autofill av felt med disse ID-ene. Wildcard (default) eller \"regex:...\".",
+    "description": ""
+  },
+  "settings_sync_label": {
+    "message": "Cloud Sync",
+    "description": ""
+  },
+  "settings_sync_desc": {
+    "message": "Push/pull regler via chrome.storage.sync",
+    "description": ""
+  },
+  "settings_scanToast_label": {
+    "message": "Scan-notifikasjon",
+    "description": ""
+  },
+  "settings_scanToast_desc": {
+    "message": "Vis toast med scan-status i øvre venstre hjørne",
+    "description": ""
+  },
+  "settingsPanel_title": {
+    "message": "Innstillinger",
+    "description": ""
+  },
+  "settingsPanel_showAdvanced": {
+    "message": "Flere innstillinger",
+    "description": ""
+  },
+  "settingsPanel_hideAdvanced": {
+    "message": "Skjul avansert",
+    "description": ""
+  },
+  "cloud_title": {
+    "message": "Skybackup",
+    "description": ""
+  },
+  "cloud_desc": {
+    "message": "Ta backup av regler til OneDrive eller Google Drive.",
+    "description": ""
+  },
+  "cloud_provider": {
+    "message": "Leverandør",
+    "description": ""
+  },
+  "cloud_providers_google": {
+    "message": "Google Drive",
+    "description": ""
+  },
+  "cloud_providers_onedrive": {
+    "message": "OneDrive",
+    "description": ""
+  },
+  "cloud_backup": {
+    "message": "Backup",
+    "description": ""
+  },
+  "cloud_restore": {
+    "message": "Gjenopprett",
+    "description": ""
+  },
+  "cloud_refresh": {
+    "message": "Oppdater",
+    "description": ""
+  },
+  "cloud_clientId": {
+    "message": "Client ID",
+    "description": ""
+  },
+  "cloud_tenant": {
+    "message": "Tenant (valgfritt)",
+    "description": ""
+  },
+  "cloud_saveConfig": {
+    "message": "Lagre sky-oppsett",
+    "description": ""
+  },
+  "cloud_clientIdHint": {
+    "message": "Google: https://console.cloud.google.com/apis/credentials (OAuth client ID). OneDrive: https://portal.azure.com → Entra App Registration → Application (client) ID.",
+    "description": ""
+  },
+  "cloud_tenantHint": {
+    "message": "OneDrive: Tenant ID fra Entra (bruk \"common\" hvis tom).",
+    "description": ""
+  },
+  "cloud_login": {
+    "message": "Logg inn",
+    "description": ""
+  },
+  "cloud_loginSuccess": {
+    "message": "Innlogging mot {provider} OK. Du kan nå kjøre backup/restore.",
+    "description": ""
+  },
+  "cloud_loginError": {
+    "message": "Innlogging feilet: {error}",
+    "description": ""
+  },
+  "cloud_missingClientId": {
+    "message": "Legg til Client ID for {provider} forst.",
+    "description": ""
+  },
+  "cloud_backupSuccess": {
+    "message": "Backup lastet opp til {provider}.",
+    "description": ""
+  },
+  "cloud_backupError": {
+    "message": "Backup feilet: {error}",
+    "description": ""
+  },
+  "cloud_listError": {
+    "message": "Kunne ikke hente backup-liste: {error}",
+    "description": ""
+  },
+  "cloud_downloadError": {
+    "message": "Kunne ikke laste ned backup: {error}",
+    "description": ""
+  },
+  "cloud_restoreConfirm": {
+    "message": "Slå sammen med eksisterende regler? OK = Slå sammen, Avbryt = Erstatt.",
+    "description": ""
+  },
+  "cloud_restoreSuccess": {
+    "message": "Importerte {count} regler fra {name}.",
+    "description": ""
+  },
+  "cloud_noBackups": {
+    "message": "Ingen backups funnet.",
+    "description": ""
+  },
+  "cloud_selectFile": {
+    "message": "Velg en backup for gjenoppretting",
+    "description": ""
+  },
+  "cloud_useDefaultConfirm": {
+    "message": "Lagre direkte til Nedlastinger/AutoFill? OK = Lagre der, Avbryt = Velg mappe",
+    "description": ""
+  },
+  "cloud_useDefaultDir": {
+    "message": "Lagre til Nedlastinger/AutoFill (hopp over dialog hvis nettleseren tillater det)",
+    "description": ""
+  },
+  "cloud_noLoginNeeded": {
+    "message": "Ingen innlogging kreves for lokal backup.",
+    "description": ""
+  },
+  "ai_title": {
+    "message": "AI-feltgjenkjenning",
+    "description": ""
+  },
+  "ai_copy": {
+    "message": "Kopier",
+    "description": ""
+  },
+  "ai_refresh": {
+    "message": "Oppdater",
+    "description": ""
+  },
+  "ai_intro": {
+    "message": "Kopier prompten under og bruk i valgfri LLM for å få forslag til autofill-regler.",
+    "description": ""
+  },
+  "ai_wildcard": {
+    "message": "Wildcards: * = alle tegn, ? = ett tegn.",
+    "description": ""
+  },
+  "ai_regex": {
+    "message": "Aktiver regex for avanserte matcher (eksempler: ^user.* , email|e-mail).",
+    "description": ""
+  },
+  "ai_promptText": {
+    "message": "Du er ekspert på å generere autofill-regler for nettleserutvidelsen vår.\nReturner CSV med headeren:\nid;sitePattern;siteMatchType;elementType;fieldType;fieldPattern;fieldUseRegex;value;enabled;created;lastUsed\nÉn regel per linje, semikolonseparert. Sett enabled=true, bruk siteMatchType=host hvis usikker.",
+    "description": ""
+  },
+  "ai_promptLabel": {
+    "message": "LLM-prompt",
+    "description": ""
+  },
+  "ai_pasteCsvLabel": {
+    "message": "Lim inn LLM-resultat (CSV)",
+    "description": ""
+  },
+  "ai_csvPlaceholder": {
+    "message": "Lim inn semikolonseparert CSV fra LLM her...",
+    "description": ""
+  },
+  "ai_importBtn": {
+    "message": "Importer",
+    "description": ""
+  },
+  "ai_importMissing": {
+    "message": "Lim inn CSV-resultatet fra LLM først.",
+    "description": ""
+  },
+  "ai_existingRules": {
+    "message": "Eksisterende regler (kontekst):",
+    "description": ""
+  },
+  "ai_detectedFields": {
+    "message": "Oppdagede felter (aktiv side):",
+    "description": ""
+  },
+  "ai_none": {
+    "message": "(ingen)",
+    "description": ""
+  },
+  "merge_noTerm": {
+    "message": "Bruk søkefeltet for å angi filter før sammenslåing.",
+    "description": ""
+  },
+  "merge_noMatches": {
+    "message": "Ingen regler matcher filteret.",
+    "description": ""
+  },
+  "merge_success": {
+    "message": "Slo sammen regler for: {types}",
+    "description": ""
+  },
+  "merge_error": {
+    "message": "Kunne ikke slå sammen regler: ",
+    "description": ""
+  },
+  "conflict": {
+    "message": "Konflikt",
+    "description": ""
+  },
+  "conflictHint": {
+    "message": "Flere regler matcher dette feltet; høyest prioritet vinner",
+    "description": ""
+  },
+  "conflictWinner": {
+    "message": "vinner",
+    "description": ""
+  },
+  "toast_saved": {
+    "message": "Innstillinger lagret",
+    "description": ""
+  },
+  "toast_error": {
+    "message": "Feil ved lagring",
+    "description": ""
+  },
+  "variables_title": {
+    "message": "Variabler",
+    "description": ""
+  },
+  "variables_desc": {
+    "message": "Definer variabler som kan brukes i feltverdier som {variabelNavn}.",
+    "description": ""
+  },
+  "variables_placeholderKey": {
+    "message": "Navn (f.eks. firstName)",
+    "description": ""
+  },
+  "variables_placeholderValue": {
+    "message": "Verdi (f.eks. Lars)",
+    "description": ""
+  },
+  "variables_add": {
+    "message": "Legg til",
+    "description": ""
+  },
+  "variables_delete": {
+    "message": "Slett",
+    "description": ""
+  },
+  "variables_empty": {
+    "message": "Ingen variabler definert.",
+    "description": ""
+  },
+  "variables_confirmDelete": {
+    "message": "Slett variabel",
+    "description": ""
+  },
+  "variables_saveError": {
+    "message": "Kunne ikke lagre variabel",
+    "description": ""
+  },
+  "variables_deleteError": {
+    "message": "Kunne ikke slette variabel",
+    "description": ""
+  },
+  "variables_builtins": {
+    "message": "[object Object]\n[object Object]\n[object Object]\n[object Object]\n[object Object]",
+    "description": ""
+  },
+  "variables_inlineHeading": {
+    "message": "Variabler du kan bruke i verdi-feltet:",
+    "description": ""
+  },
+  "importPreview_title": {
+    "message": "Import og validering",
+    "description": ""
+  },
+  "importPreview_summary": {
+    "message": "Linjer: {total}. Gyldige: {valid}. Duplikater: {dupes}. Ugyldige: {invalid}.",
+    "description": ""
+  },
+  "importPreview_duplicates": {
+    "message": "Duplikater",
+    "description": ""
+  },
+  "importPreview_invalid": {
+    "message": "Ugyldige linjer",
+    "description": ""
+  },
+  "importPreview_none": {
+    "message": "Ingen",
+    "description": ""
+  },
+  "importPreview_line": {
+    "message": "Linje {num}",
+    "description": ""
+  },
+  "importPreview_andMore": {
+    "message": "...og {count} til",
+    "description": ""
+  },
+  "importPreview_skipDuplicates": {
+    "message": "Hopp over duplikater",
+    "description": ""
+  },
+  "importPreview_skipInvalid": {
+    "message": "Hopp over ugyldige linjer",
+    "description": ""
+  },
+  "importPreview_import": {
+    "message": "Importer",
+    "description": ""
+  },
+  "importPreview_validateOnly": {
+    "message": "Lukk",
+    "description": ""
+  },
+  "alerts_noRulesCloud": {
+    "message": "Ingen regler funnet i skyen.",
+    "description": ""
+  },
+  "alerts_cloudChoice": {
+    "message": "Fant {count} regler i skyen.\n\nVelg handling:\n1. Overskriv (Sletter lokale regler og erstatter med sky-regler)\n2. Merge (Legger til nye regler, beholder lokale ved konflikt)\n3. Smart Merge (Legger til nye, og beholder BEGGE ved konflikt - duplikatvarsel)",
+    "description": ""
+  },
+  "alerts_overwriteSuccess": {
+    "message": "Erstattet lokale regler med {count} regler fra skyen.",
+    "description": ""
+  },
+  "alerts_mergeSuccess": {
+    "message": "Merge fullført.\nLa til: {added}\nKonflikter løst (duplikater opprettet): {conflicts}",
+    "description": ""
+  },
+  "alerts_fetchError": {
+    "message": "Feil ved henting: ",
+    "description": ""
+  },
+  "alerts_duplicateWarning": {
+    "message": "Advarsel: Denne regelen er en duplikat (samme site og felt)",
+    "description": ""
+  },
+  "alerts_duplicateBadge": {
+    "message": "Duplikat",
+    "description": ""
+  },
+  "alerts_duplicateChoice": {
+    "message": "En regel for {site} / {field} finnes allerede.\nOK = Erstatt med ny, Avbryt = Behold eksisterende.",
+    "description": ""
+  },
+  "alerts_similarRule": {
+    "message": "En lignende regel eksisterer allerede. Fortsette likevel?",
+    "description": ""
+  },
+  "alerts_coveredRule": {
+    "message": "OBS: Denne regelen er allerede dekket av en eksisterende regel:\nSite: {site}\nFelt: {field}\nVerdi: {value}\n\nVil du opprette den likevel?",
+    "description": ""
+  },
+  "alerts_confirmDeleteRule": {
+    "message": "Er du sikker på at du vil slette denne regelen?",
+    "description": ""
+  },
+  "alerts_deleteError": {
+    "message": "Kunne ikke slette regel",
+    "description": ""
+  },
+  "alerts_saveError": {
+    "message": "Kunne ikke lagre regel",
+    "description": ""
+  },
+  "alerts_exportError": {
+    "message": "Kunne ikke eksportere regler",
+    "description": ""
+  },
+  "alerts_importSuccess": {
+    "message": "Importert {count} regler",
+    "description": ""
+  },
+  "alerts_importError": {
+    "message": "Feil ved import: ",
+    "description": ""
+  },
+  "alerts_importEmpty": {
+    "message": "Ingen data å importere.",
+    "description": ""
+  },
+  "alerts_invalidColumns": {
+    "message": "Ugyldige CSV-kolonner. Mangler: {cols}",
+    "description": ""
+  },
+  "alerts_importInvalidRows": {
+    "message": "Noen linjer er ugyldige og hoppes over.",
+    "description": ""
+  },
+  "alerts_importConfirm": {
+    "message": "Fortsette med import?",
+    "description": ""
+  },
+  "alerts_noMatches": {
+    "message": "Ingen matcher funnet",
+    "description": ""
+  },
+  "alerts_testMatchResult": {
+    "message": "Felt: {total}\nMatches:\n{matches}",
+    "description": ""
+  },
+  "alerts_testMatchError": {
+    "message": "Kunne ikke teste match (mangler content script?)",
+    "description": ""
+  },
+  "alerts_invalidRegex": {
+    "message": "Ugyldig regex: ",
+    "description": ""
+  },
+  "alerts_optimizerError": {
+    "message": "Kunne ikke analysere regler",
+    "description": ""
+  },
+  "alerts_forceFillError": {
+    "message": "Kunne ikke tvinge utfylling",
+    "description": ""
+  },
+  "optimizer_title": {
+    "message": "Optimaliseringsforslag",
+    "description": ""
+  },
+  "optimizer_stats_total": {
+    "message": "Totalt",
+    "description": ""
+  },
+  "optimizer_stats_active": {
+    "message": "Aktive",
+    "description": ""
+  },
+  "optimizer_stats_regex": {
+    "message": "Regex",
+    "description": ""
+  },
+  "optimizer_stats_unused": {
+    "message": "Aldri brukt",
+    "description": ""
+  },
+  "optimizer_stats_suggestions": {
+    "message": "Forslag",
+    "description": ""
+  },
+  "optimizer_empty_title": {
+    "message": "Ingen optimaliseringsforslag",
+    "description": ""
+  },
+  "optimizer_empty_desc": {
+    "message": "Reglene dine ser bra ut!",
+    "description": ""
+  },
+  "optimizer_actions_apply": {
+    "message": "Bruk forslag",
+    "description": ""
+  },
+  "optimizer_actions_dismiss": {
+    "message": "Avvis",
+    "description": ""
+  },
+  "optimizer_actions_ignore": {
+    "message": "Ignorer regel",
+    "description": ""
+  },
+  "elementTypes_text": {
+    "message": "Tekstfelt",
+    "description": ""
+  },
+  "elementTypes_checkbox": {
+    "message": "Avkrysningsboks",
+    "description": ""
+  },
+  "elementTypes_radio": {
+    "message": "Radio button",
+    "description": ""
+  },
+  "elementTypes_select": {
+    "message": "Dropdown",
+    "description": ""
+  },
+  "elementTypes_textarea": {
+    "message": "Tekstområde",
+    "description": ""
+  },
+  "elementTypes_contenteditable": {
+    "message": "Redigerbart innhold",
+    "description": ""
+  },
+  "fieldTypes_name": {
+    "message": "Name-attributt",
+    "description": ""
+  },
+  "fieldTypes_id": {
+    "message": "ID-attributt",
+    "description": ""
+  },
+  "fieldTypes_placeholder": {
+    "message": "Placeholder",
+    "description": ""
+  },
+  "fieldTypes_selector": {
+    "message": "CSS selector (avansert)",
+    "description": ""
+  },
+  "matchTypes_host": {
+    "message": "Host",
+    "description": ""
+  },
+  "matchTypes_domain": {
+    "message": "Domene",
+    "description": ""
+  },
+  "matchTypes_url": {
+    "message": "URL",
+    "description": ""
+  },
+  "matchTypes_regex": {
+    "message": "Regex",
+    "description": ""
+  },
+  "conditionTypes_none": {
+    "message": "Ingen betingelse",
+    "description": ""
+  },
+  "conditionTypes_urlContains": {
+    "message": "URL inneholder",
+    "description": ""
+  },
+  "conditionTypes_urlRegex": {
+    "message": "URL regex",
+    "description": ""
+  },
+  "conditionTypes_selectorExists": {
+    "message": "Selector finnes",
+    "description": ""
+  },
+  "autofillModes_auto": {
+    "message": "Automatisk ved last",
+    "description": ""
+  },
+  "autofillModes_interaction": {
+    "message": "Kun ved interaksjon",
+    "description": ""
+  },
+  "sortOptions_order": {
+    "message": "Egendefinert rekkefølge",
+    "description": ""
+  },
+  "sortOptions_lastUsed": {
+    "message": "Sist brukt",
+    "description": ""
+  },
+  "sortOptions_created": {
+    "message": "Nyeste først",
+    "description": ""
+  },
+  "sortOptions_site": {
+    "message": "Nettsted (A-Å)",
+    "description": ""
+  },
+  "sortOptions_field": {
+    "message": "Felt (A-Å)",
+    "description": ""
+  },
+  "filters_enabled": {
+    "message": "Kun aktive",
+    "description": ""
+  },
+  "filters_regex": {
+    "message": "Kun regex",
+    "description": ""
+  },
+  "filters_sortLabel": {
+    "message": "Sorter:",
+    "description": ""
+  },
+  "profiles_label": {
+    "message": "Profil",
+    "description": ""
+  },
+  "profiles_manage": {
+    "message": "Administrer profiler",
+    "description": ""
+  },
+  "profiles_add": {
+    "message": "Legg til profil",
+    "description": ""
+  },
+  "profiles_delete": {
+    "message": "Slett",
+    "description": ""
+  },
+  "profiles_namePlaceholder": {
+    "message": "Profilnavn (f.eks. Jobb)",
+    "description": ""
+  },
+  "profiles_confirmDelete": {
+    "message": "Slett profil \"{name}\"? Alle tilhørende regler vil bli slettet!",
+    "description": ""
+  },
+  "profiles_cannotDeleteDefault": {
+    "message": "Kan ikke slette standardprofilen.",
+    "description": ""
+  },
+  "profiles_allProfiles": {
+    "message": "Alle profiler",
+    "description": ""
+  },
+  "profiles_moveTitle": {
+    "message": "Flytt regler",
+    "description": ""
+  },
+  "profiles_moveDesc": {
+    "message": "Velg mål-profil:",
+    "description": ""
+  },
+  "profiles_moveSuccess": {
+    "message": "Flyttet {count} regler til \"{profile}\"",
+    "description": ""
+  },
+  "scan_scanning": {
+    "message": "Skanner...",
+    "description": ""
+  },
+  "scan_rules": {
+    "message": "regler",
+    "description": ""
+  },
+  "scan_matches": {
+    "message": "treff",
+    "description": ""
+  },
+  "scan_partial": {
+    "message": "delvis",
+    "description": ""
+  },
+  "manifest_name": {
+    "message": "AutoFill Plugin",
+    "description": "Navn på utvidelsen"
+  },
+  "manifest_description": {
+    "message": "Automatiser skjemautfylling med presisjon. Støtte for regex, profiler og avansert feltmatching.",
+    "description": "Beskrivelse av utvidelsen"
+  }
+}

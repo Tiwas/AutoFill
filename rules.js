@@ -5,7 +5,6 @@ let groupBySite = true;
 let sortBy = 'order';
 let editingRuleId = null;
 let availableFields = []; // Added for renderAvailableFields
-let currentLanguage = 'en';
 let currentProfileId = null;
 let profiles = [];
 let userVariables = {};
@@ -226,7 +225,6 @@ async function loadSettings() {
       elements.notificationToggle.checked = result.notificationsEnabled !== false; // Default true
   }
 
-  currentLanguage = result.language || 'en';
   userVariables = result.userVariables || {};
   currentProfileId = result.currentProfileId || 'default';
   applyTranslations();
@@ -243,7 +241,7 @@ async function saveBlacklist() {
     blacklist 
   });
   
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   alert(t.toast?.saved || 'Settings saved');
 }
 
@@ -273,10 +271,10 @@ function handleSelectAll(e) {
 function toggleSelectMode() {
   selectMode = !selectMode;
   selectedRules.clear();
-  if (elements.selectModeBtn && TRANSLATIONS[currentLanguage]) {
+  if (elements.selectModeBtn && TRANSLATIONS.current) {
     elements.selectModeBtn.textContent = selectMode
-      ? (TRANSLATIONS[currentLanguage].buttons?.cancel || 'Avbryt')
-      : (TRANSLATIONS[currentLanguage].buttons?.selectModeBtn || 'Velg flere');
+      ? (TRANSLATIONS.current.buttons?.cancel || 'Avbryt')
+      : (TRANSLATIONS.current.buttons?.selectModeBtn || 'Velg flere');
   }
   if (elements.selectionBar) {
     elements.selectionBar.style.display = selectMode ? 'flex' : 'none';
@@ -287,7 +285,7 @@ function toggleSelectMode() {
 }
 
 async function loadRules() {
-  const loadingText = (TRANSLATIONS[currentLanguage]?.rulesPage?.empty?.loading) || 'Laster regler...';
+  const loadingText = (TRANSLATIONS.current?.rulesPage?.empty?.loading) || 'Laster regler...';
   elements.rulesContainer.innerHTML = `<p class="empty">${escapeHtml(loadingText)}</p>`;
   const response = await chrome.runtime.sendMessage({ action: 'getAllRules' });
   allRules = response || [];
@@ -405,7 +403,7 @@ function syncSearchModeLock() {
 }
 
 async function mergeFilteredRules() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   const term = elements.searchInput.value.trim();
   const mergeLabel = t.merge?.button || 'Merge filtered';
 
@@ -486,7 +484,7 @@ function renderRules() {
   const conflictWinners = conflictInfo.winners;
 
   if (sorted.length === 0) {
-    const emptyText = (TRANSLATIONS[currentLanguage]?.rulesPage?.empty?.none) || (TRANSLATIONS[currentLanguage]?.emptyRules) || 'Ingen regler funnet';
+    const emptyText = (TRANSLATIONS.current?.rulesPage?.empty?.none) || (TRANSLATIONS.current?.emptyRules) || 'Ingen regler funnet';
     container.innerHTML = `<p class="empty">${escapeHtml(emptyText)}</p>`;
     return;
   }
@@ -607,9 +605,9 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
 
   const main = document.createElement('div');
   main.className = 'rule-main';
-  const rLabels = TRANSLATIONS[currentLanguage]?.ruleLabels || {};
-  const typeLabels = TRANSLATIONS[currentLanguage]?.fieldTypes || {};
-  const matchLabels = TRANSLATIONS[currentLanguage]?.matchTypes || {};
+  const rLabels = TRANSLATIONS.current?.ruleLabels || {};
+  const typeLabels = TRANSLATIONS.current?.fieldTypes || {};
+  const matchLabels = TRANSLATIONS.current?.matchTypes || {};
   main.innerHTML = `
     <div><strong>${escapeHtml(rule.sitePattern)}</strong></div>
     <div>${escapeHtml(typeLabels[rule.fieldType] || rule.fieldType)}: ${escapeHtml(rule.fieldPattern)}</div>
@@ -622,11 +620,11 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
   if (rule.fieldUseRegex) meta.innerHTML += '<span class="pill">Regex</span>';
   meta.innerHTML += `<span class="pill">${escapeHtml(matchLabels[rule.siteMatchType] || rule.siteMatchType)}</span>`;
   if (rule.lastUsed) {
-    const lastLabel = TRANSLATIONS[currentLanguage]?.ruleLabels?.lastUsed || 'Sist';
+    const lastLabel = TRANSLATIONS.current?.ruleLabels?.lastUsed || 'Sist';
     meta.innerHTML += `<span class="pill">${escapeHtml(lastLabel)}: ${formatDate(rule.lastUsed)}</span>`;
   }
   if (isConflict) {
-    const conflictLabel = TRANSLATIONS[currentLanguage]?.conflict || 'Conflict';
+    const conflictLabel = TRANSLATIONS.current?.conflict || 'Conflict';
     const key = [
       rule.sitePattern || '',
       rule.fieldType || '',
@@ -635,8 +633,8 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
     ].join('|');
     const winnerId = conflictWinners.get(key);
     const isWinner = winnerId === rule.id;
-    const winnerTag = isWinner ? ` (${(TRANSLATIONS[currentLanguage]?.conflictWinner || 'winner')})` : '';
-    const title = `${conflictLabel} - ${(TRANSLATIONS[currentLanguage]?.conflictHint || 'Multiple rules match this field; highest priority wins')}`;
+    const winnerTag = isWinner ? ` (${(TRANSLATIONS.current?.conflictWinner || 'winner')})` : '';
+    const title = `${conflictLabel} - ${(TRANSLATIONS.current?.conflictHint || 'Multiple rules match this field; highest priority wins')}`;
     const label = `${conflictLabel}${winnerTag}`;
     meta.innerHTML += `<span class="pill pill-warning" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
   }
@@ -648,7 +646,7 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
   editBtn.className = 'btn btn-secondary';
   editBtn.style.padding = '4px 8px';
   editBtn.style.fontSize = '12px';
-  editBtn.textContent = (TRANSLATIONS[currentLanguage]?.ruleActions?.edit) || 'Rediger';
+  editBtn.textContent = (TRANSLATIONS.current?.ruleActions?.edit) || 'Rediger';
   editBtn.onclick = () => openEditModal(rule.id);
 
   const deleteBtn = document.createElement('button');
@@ -658,7 +656,7 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
   deleteBtn.style.padding = '4px 8px';
   deleteBtn.style.fontSize = '12px';
   deleteBtn.style.marginLeft = '5px';
-  deleteBtn.textContent = TRANSLATIONS[currentLanguage]?.ruleActions?.delete || 'Slett';
+  deleteBtn.textContent = TRANSLATIONS.current?.ruleActions?.delete || 'Slett';
   deleteBtn.onclick = async () => {
     if(confirm('Er du sikker på at du vil slette denne regelen?')) {
         await chrome.runtime.sendMessage({ action: 'deleteRule', ruleId: rule.id });
@@ -696,7 +694,7 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
   toggleInput.addEventListener('change', () => updateRule(rule.id, { enabled: toggleInput.checked }));
   
   toggleLabel.appendChild(toggleInput);
-  toggleLabel.append(` ${(TRANSLATIONS[currentLanguage]?.ruleLabels?.enabled) || 'Aktiv'}`);
+  toggleLabel.append(` ${(TRANSLATIONS.current?.ruleLabels?.enabled) || 'Aktiv'}`);
 
   actions.appendChild(editBtn);
   actions.appendChild(deleteBtn);
@@ -743,7 +741,7 @@ function exportSelected() {
 }
 
 async function handleLocalBackup() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   let objectUrl;
   try {
     const csv = buildCSV(allRules);
@@ -778,7 +776,7 @@ async function handleImport(e, mode = 'import') {
   const file = e?.target?.files?.[0];
   if (!file) return;
   if (e?.target) e.target.value = '';
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
 
   try {
     const content = await file.text();
@@ -795,7 +793,7 @@ async function handleImport(e, mode = 'import') {
 }
 
 function analyzeCsvForImport(content, existingRules) {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   const normalized = normalizeCsvSeparators(content || '');
   const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (!lines.length) {
@@ -908,7 +906,7 @@ function renderIssueList(list, target, t) {
 let importPreviewState = null;
 
 function showImportPreviewModal(analysis, mode = 'import') {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   importPreviewState = { analysis, mode };
 
   if (elements.importPreviewModal) elements.importPreviewModal.style.display = 'flex';
@@ -944,10 +942,16 @@ function closeImportPreviewModal() {
 }
 
 async function confirmImportPreview() {
-  if (!importPreviewState) return;
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
 
-  const skipDuplicates = elements.skipDuplicatesToggle ? elements.skipDuplicatesToggle.checked : true;
+  if (!importPreviewState) return;
+
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
+
+
+
+  const skipDuplicates = elements.skipDuplicatesToggle ? elements.skipDuplicatesToggle.checked : true
+
+;
   const skipInvalid = elements.skipInvalidToggle ? elements.skipInvalidToggle.checked : true;
   const csv = buildCsvFromAnalysis(importPreviewState.analysis, { skipDuplicates, skipInvalid });
 
@@ -976,7 +980,7 @@ function openEditModal(ruleId) {
     if (!rule) return;
 
     if (modalTitle) {
-      modalTitle.textContent = (TRANSLATIONS[currentLanguage]?.modalTitleEdit) || 'Rediger regel';
+      modalTitle.textContent = (TRANSLATIONS.current?.modalTitleEdit) || 'Rediger regel';
     }
     document.getElementById('sitePattern').value = rule.sitePattern;
     document.getElementById('siteMatchType').value = rule.siteMatchType;
@@ -994,7 +998,7 @@ function openEditModal(ruleId) {
     if (elements.ruleProfileSelect) elements.ruleProfileSelect.value = rule.profileId || 'default';
   } else {
     if (modalTitle) {
-      modalTitle.textContent = (TRANSLATIONS[currentLanguage]?.modalTitleNew) || 'Ny regel';
+      modalTitle.textContent = (TRANSLATIONS.current?.modalTitleNew) || 'Ny regel';
     }
     elements.editForm.reset();
     document.getElementById('priority').value = 0;
@@ -1048,7 +1052,7 @@ async function handleSaveRule(e) {
 async function handleBulkAction(action) {
   if (selectedRules.size === 0) return;
   const ids = Array.from(selectedRules);
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   let confirmText = '';
   if (action === 'delete') confirmText = t.alerts?.confirmDeleteRule || 'Slette valgte regler?';
   if (confirmText && !confirm(confirmText)) return;
@@ -1275,7 +1279,7 @@ async function loadVariables() {
 }
 
 function getBuiltInVariables() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   const fallback = [
     { key: 'date', desc: 'Current date (YYYY-MM-DD)' },
     { key: 'time', desc: 'Current time (HH:MM:SS)' },
@@ -1299,7 +1303,7 @@ function renderVariables() {
     if (builtins.length) {
       const heading = document.createElement('h4');
       heading.className = 'variables-heading-inline';
-      heading.textContent = (TRANSLATIONS[currentLanguage]?.variables?.inlineHeading) || (TRANSLATIONS.en?.variables?.inlineHeading) || 'Variables you can use in the value field:';
+      heading.textContent = (TRANSLATIONS.current?.variables?.inlineHeading) || (TRANSLATIONS.en?.variables?.inlineHeading) || 'Variables you can use in the value field:';
       list.appendChild(heading);
 
       builtins.forEach(b => {
@@ -1316,7 +1320,7 @@ function renderVariables() {
     }
 
     if (keys.length === 0 && builtins.length === 0) {
-      list.innerHTML = '<p class="empty-text">' + ((TRANSLATIONS[currentLanguage]?.variables?.empty) || 'Ingen variabler definert.') + '</p>';
+      list.innerHTML = '<p class="empty-text">' + ((TRANSLATIONS.current?.variables?.empty) || 'Ingen variabler definert.') + '</p>';
       return;
     }
 
@@ -1328,7 +1332,7 @@ function renderVariables() {
           <span class="variable-key">{${escapeHtml(key)}}</span>
           <span class="variable-value">${escapeHtml(userVariables[key])}</span>
         </div>
-        <button class="btn btn-small btn-danger delete-var-btn" data-key="${escapeHtml(key)}">${(TRANSLATIONS[currentLanguage]?.variables?.delete) || 'Slett'}</button>
+        <button class="btn btn-small btn-danger delete-var-btn" data-key="${escapeHtml(key)}">${(TRANSLATIONS.current?.variables?.delete) || 'Slett'}</button>
       `;
 
       div.querySelector('.delete-var-btn').addEventListener('click', () => handleDeleteVariable(key));
@@ -1384,7 +1388,7 @@ function copyAiPrompt() {
 
 function generateAiPrompt() {
   if (!elements.aiPrompt) return;
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
 
   const header = Array.isArray(t.ai?.promptText) ? t.ai.promptText : [
     'You are an expert at generating autofill rules for a browser extension.',
@@ -1430,7 +1434,7 @@ function generateAiPrompt() {
 }
 
 async function handleAiCsvImport() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   const raw = elements.aiCsvInput?.value || '';
   const csv = prepareAiCsvForImport(raw);
 
@@ -1479,20 +1483,20 @@ function showOptimizer() {
 
   if (typeof RuleOptimizer === 'undefined') {
     console.error('RuleOptimizer not loaded');
-    alert((currentLanguage === 'no'
+    alert((TRANSLATIONS.current
       ? 'Optimizer er ikke tilgjengelig. Last siden på nytt.'
       : 'Optimizer is not available. Please reload the page.'));
     return;
   }
 
   if (allRules.length === 0) {
-    alert((currentLanguage === 'no'
+    alert((TRANSLATIONS.current
       ? 'Ingen regler å optimalisere. Legg til noen regler først.'
       : 'No rules to optimize. Add some rules first.'));
     return;
   }
 
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   try {
     console.log('Generating optimizer report...');
     const report = RuleOptimizer.generateReport(allRules);
@@ -1729,7 +1733,7 @@ function renderSuggestions(suggestions, t) {
 }
 
 async function applySuggestion(suggestion) {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   try {
     switch (suggestion.action) {
       case 'delete':
@@ -1827,11 +1831,11 @@ function handleActiveProfileChange() {
 
 // --- Test match passthrough ---
 async function handleTestMatch() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   try {
     const tab = await getActiveContentTab();
     if (!tab) {
-      alert((currentLanguage === 'no'
+      alert((TRANSLATIONS.current
         ? 'Ingen gyldig side åpen. Åpne en vanlig webside (ikke chrome://) og prøv igjen.'
         : 'No valid page open. Open a regular webpage (not chrome://) and try again.'));
       return;
@@ -1854,7 +1858,7 @@ async function handleTestMatch() {
         response = await chrome.tabs.sendMessage(tab.id, { action: 'testMatches' });
       } catch (injectError) {
         console.error('Failed to inject content script:', injectError);
-        alert((currentLanguage === 'no'
+        alert((TRANSLATIONS.current
           ? 'Kunne ikke koble til siden. Last siden på nytt og prøv igjen.'
           : 'Could not connect to page. Reload the page and try again.'));
         return;
@@ -1892,7 +1896,7 @@ async function getActiveContentTab() {
 
 // --- Regex Help ---
 function showRegexHelp() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   const title = t.copy?.regexHelpTitle || 'Regex help';
   const helpText = t.copy?.regexHelp || '';
   alert(`${title}\n\n${helpText}`);
@@ -1900,11 +1904,9 @@ function showRegexHelp() {
 
 // --- Translations ---
 function applyTranslations() {
-  const t = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en || {};
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   syncSearchModeLock();
-  if (document?.documentElement) {
-    document.documentElement.lang = currentLanguage || 'en';
-  }
+  
   const page = t.rulesPage || {};
 
   const setText = (el, value) => { if (el && value) el.textContent = value; };
@@ -2103,3 +2105,4 @@ function applyTranslations() {
     if (submitBtn && t.variables?.add) submitBtn.textContent = t.variables.add;
   });
 }
+

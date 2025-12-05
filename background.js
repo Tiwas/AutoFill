@@ -6,18 +6,8 @@
 // Importer nødvendige moduler
 importScripts('storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js');
 
-let currentLanguage = 'en';
 const CONTEXT_MENU_SET_PROFILE_PARENT = 'autofill_set_profile_parent';
 const CONTEXT_MENU_SET_PROFILE_PREFIX = 'autofill_set_profile_';
-
-async function loadLanguage() {
-  try {
-    const result = await chrome.storage.local.get(['language']);
-    currentLanguage = result.language || 'en';
-  } catch (e) {
-    currentLanguage = 'en';
-  }
-}
 
 // Context menu IDs
 const CONTEXT_MENU_ADD_FIELD = 'autofill_add_field';
@@ -32,7 +22,7 @@ const CLOUD_TOKENS_KEY = 'cloudTokens';
  */
 chrome.runtime.onInstalled.addListener(() => {
   console.log('AutoFill Plugin installed');
-  loadLanguage().then(createContextMenus);
+  createContextMenus();
   initBadge();
   ensureContentScriptRegistered();
 });
@@ -95,9 +85,8 @@ async function updateBadge(autofillEnabled) {
  * Opprett context menus
  */
 async function createContextMenus() {
-  await loadLanguage();
   const profiles = await Storage.getProfiles();
-  const t = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[currentLanguage]) || TRANSLATIONS?.en || {};
+  const t = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS.current) || TRANSLATIONS?.en || {};
   const cm = t.contextMenu || {};
 
   // Fjern eksisterende menus først
@@ -541,12 +530,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       sendResponse({ success: false, error: 'No tab info' });
       return true;
-  }
-});
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.language) {
-    loadLanguage().then(createContextMenus);
   }
 });
 

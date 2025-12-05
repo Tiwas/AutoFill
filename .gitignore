@@ -1,0 +1,14 @@
+# Ignore generated/temporary folders
+backups/
+tmp/
+scripts/
+
+# Node artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS junk
+.DS_Store
+Thumbs.db

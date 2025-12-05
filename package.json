@@ -1,0 +1,9 @@
+{
+  "name": "autofill-plugin",
+  "version": "0.8.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node tests/run-tests.js"
+  }
+}

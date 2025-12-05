@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Icons</title>
+</head>
+<body>
+  <h1>AutoFill Plugin Icon Generator</h1>
+  <p>Dette vil generere PNG-ikoner fra SVG. Åpne denne filen i Chrome og klikk knappene.</p>
+
+  <canvas id="canvas16" width="16" height="16" style="border: 1px solid black; image-rendering: pixelated; width: 64px; height: 64px;"></canvas>
+  <button onclick="download('canvas16', 'icon16.png')">Last ned 16x16</button>
+  <br><br>
+
+  <canvas id="canvas48" width="48" height="48" style="border: 1px solid black; width: 96px; height: 96px;"></canvas>
+  <button onclick="download('canvas48', 'icon48.png')">Last ned 48x48</button>
+  <br><br>
+
+  <canvas id="canvas128" width="128" height="128" style="border: 1px solid black; width: 128px; height: 128px;"></canvas>
+  <button onclick="download('canvas128', 'icon128.png')">Last ned 128x128</button>
+  <br><br>
+
+  <button onclick="generateAll()">Generer Alle Ikoner</button>
+
+  <script>
+    const svgString = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="60" fill="url(#grad)"/>
+  <rect x="35" y="30" width="58" height="68" rx="4" fill="white" opacity="0.95"/>
+  <rect x="42" y="42" width="44" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+  <rect x="42" y="54" width="44" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+  <rect x="42" y="66" width="28" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+  <path d="M 78 72 L 84 78 L 95 60" stroke="#764ba2" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+    `.trim();
+
+    function drawIcon(canvasId, size) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+
+      const img = new Image();
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+
+      img.onload = function() {
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+      };
+
+      img.src = url;
+    }
+
+    function download(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function generateAll() {
+      drawIcon('canvas16', 16);
+      setTimeout(() => drawIcon('canvas48', 48), 100);
+      setTimeout(() => drawIcon('canvas128', 128), 200);
+      alert('Ikoner generert! Klikk på "Last ned" knappene for hver størrelse.');
+    }
+
+    // Generate on load
+    window.onload = function() {
+      generateAll();
+    };
+  </script>
+</body>
+</html>

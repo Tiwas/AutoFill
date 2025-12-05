@@ -1,0 +1,69 @@
+name: Sync to AutoFill repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch to sync to in AutoFill'
+        required: false
+        default: 'main'
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: AutoFill
+      TARGET_BRANCH: ${{ github.event.inputs.target_branch || 'main' }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare export set
+        run: |
+          mkdir -p export
+          rsync -av \
+            --prune-empty-dirs \
+            --include="README.md" \
+            --include="manifest.json" \
+            --include="package.json" \
+            --include="*.js" \
+            --include="*.html" \
+            --include="*.css" \
+            --include="icon.svg" \
+            --include="icons/***" \
+            --exclude="*.md" \
+            --exclude="backups/***" \
+            --exclude="tmp/***" \
+            --exclude="tests/***" \
+            --exclude=".github/***" \
+            --exclude="scripts/***" \
+            --exclude="*.lock" \
+            ./ export/
+
+      - name: Initialize target repo
+        run: |
+          cd export
+          git init
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "Sync from source repo"
+
+      - name: Push to target repo
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          if [ -z "$SYNC_TOKEN" ]; then
+            echo "SYNC_TOKEN secret is required to push to target repo" >&2
+            exit 1
+          fi
+          cd export
+          git remote add dest "https://x-access-token:${SYNC_TOKEN}@github.com/${{ github.repository_owner }}/${TARGET_REPO }.git"
+          git branch -M "${TARGET_BRANCH}"
+          git push --force dest "${TARGET_BRANCH}"

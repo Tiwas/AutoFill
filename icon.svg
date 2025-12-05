@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Gradient background -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#grad)"/>
+
+  <!-- Form/document icon -->
+  <rect x="35" y="30" width="58" height="68" rx="4" fill="white" opacity="0.95"/>
+
+  <!-- Form lines (representing fields) -->
+  <rect x="42" y="42" width="44" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+  <rect x="42" y="54" width="44" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+  <rect x="42" y="66" width="28" height="4" rx="2" fill="#667eea" opacity="0.7"/>
+
+  <!-- Checkmark/autofill symbol -->
+  <path d="M 78 72 L 84 78 L 95 60" stroke="#764ba2" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

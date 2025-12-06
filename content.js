@@ -869,7 +869,12 @@ function fillField(field, value) {
   const inputType = field.type ? field.type.toLowerCase() : '';
 
   try {
-    // Gi feltet fokus først (hjelper ofte med floating labels)
+    // Simuler et museklikk først for å "vekke" komponenten (hjelper med floating labels)
+    field.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    field.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    field.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+    // Gi feltet fokus
     field.focus();
 
     if (tagName === 'select') {
@@ -904,9 +909,19 @@ function fillField(field, value) {
                          field.getAttribute('aria-haspopup') === 'listbox';
                          
       if (isCombobox) {
-        // Simuler "Enter" for å velge det øverste resultatet
-        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-        field.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+        // Vent litt så søket rekker å kjøre, så velg første resultat
+        setTimeout(() => {
+            field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+            field.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+            
+            setTimeout(() => {
+                field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+                field.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+                // Blur etter valg
+                field.blur(); 
+            }, 100);
+        }, 500);
+        return; // Avslutt her, blur skjer i timeouten
       }
     }
 

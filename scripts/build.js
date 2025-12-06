@@ -3,7 +3,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Configuration
-const DIST_DIR = path.join(__dirname, '../dist');
+const DIST_DIR = path.join(__dirname, '../dist'); // For prod builds
+const DEV_OUT_DIR = path.join(__dirname, '../dev-build'); // For dev unpacked builds
 const SRC_DIR = path.join(__dirname, '..');
 const FILES_TO_COPY = [
   'manifest.json',
@@ -26,8 +27,17 @@ const FILES_TO_COPY = [
 
 function build(env) {
   console.log(`Building for ${env}...`);
-  const outDir = path.join(DIST_DIR, env);
   
+  let outDir;
+  if (env === 'dev') {
+    outDir = DEV_OUT_DIR;
+  } else if (env === 'prod') {
+    outDir = path.join(DIST_DIR, env);
+  } else {
+    console.error('Invalid environment specified. Use "dev" or "prod".');
+    return;
+  }
+
   // 1. Clean and create output directory
   if (fs.existsSync(outDir)) {
     fs.rmSync(outDir, { recursive: true, force: true });
@@ -54,7 +64,7 @@ function build(env) {
     if (env === 'prod') {
       // Remove 'DEV' suffix from name if present
       manifest.name = manifest.name.replace(' (DEV)', '');
-    } else {
+    } else { // dev
       // Ensure DEV suffix
       if (!manifest.name.includes('(DEV)')) {
         manifest.name += ' (DEV)';
@@ -66,44 +76,58 @@ function build(env) {
 
   console.log(`Files copied to ${outDir}`);
 
-  // 4. Zip the output (Windows specific using PowerShell)
-  const zipName = `autofill-plugin-${env}.zip`;
-  const zipPath = path.join(DIST_DIR, zipName);
-  
-  // Remove existing zip if it exists
-  if (fs.existsSync(zipPath)) {
-    fs.unlinkSync(zipPath);
+  // 4. Zip the output (only for prod builds, Windows specific using PowerShell)
+  if (env === 'prod') {
+    const zipName = `autofill-plugin-${env}.zip`;
+    const zipPath = path.join(DIST_DIR, zipName);
+    
+    // Ensure DIST_DIR exists for zip
+    if (!fs.existsSync(DIST_DIR)) {
+      fs.mkdirSync(DIST_DIR);
+    }
+
+    // Remove existing zip if it exists
+    if (fs.existsSync(zipPath)) {
+      fs.unlinkSync(zipPath);
+    }
+
+    console.log(`Creating ${zipName}...`);
+    
+    try {
+      // Use PowerShell to zip because it's built-in on Windows. 
+      // Using full paths to avoid relative path issues.
+      // Note: Compress-Archive needs the *contents* of the directory, so we append \*
+      const absOutDir = path.resolve(outDir);
+      const absZipPath = path.resolve(zipPath);
+      
+      const command = `powershell -Command "Compress-Archive -Path '${absOutDir}\*' -DestinationPath '${absZipPath}' -Force"`;
+      
+      execSync(command, { stdio: 'inherit' });
+      console.log(`Successfully created ${zipName}`);
+    } catch (error) {
+      console.error(`Failed to zip ${env} build. Ensure PowerShell is available.`);
+      console.error(error.message);
+    }
+  } else {
+    console.log(`Skipping zip for ${env} build.`);
   }
 
-  console.log(`Creating ${zipName}...`);
-  
-  try {
-    // Use PowerShell to zip because it's built-in on Windows. 
-    // Using full paths to avoid relative path issues.
-    // Note: Compress-Archive needs the *contents* of the directory, so we append \*
-    const absOutDir = path.resolve(outDir);
-    const absZipPath = path.resolve(zipPath);
-    
-    const command = `powershell -Command "Compress-Archive -Path '${absOutDir}\*' -DestinationPath '${absZipPath}' -Force"`;
-    
-    execSync(command, { stdio: 'inherit' });
-    console.log(`Successfully created ${zipName}`);
-  } catch (error) {
-    console.error(`Failed to zip ${env} build. Ensure PowerShell is available.`);
-    console.error(error.message);
-  }
+  console.log(`Build ${env} complete.`);
 }
 
 const args = process.argv.slice(2);
 const targetEnv = args[0];
 
-// Ensure dist exists
-if (!fs.existsSync(DIST_DIR)) {
-  fs.mkdirSync(DIST_DIR);
+// Ensure dist exists if prod build is chosen or default
+if (!targetEnv || targetEnv === 'prod') {
+  if (!fs.existsSync(DIST_DIR)) {
+    fs.mkdirSync(DIST_DIR);
+  }
 }
 
+
 if (!targetEnv) {
-  // Default: Build both
+  // Default: Build both (dev unpacked, prod zipped)
   build('dev');
   build('prod');
 } else {

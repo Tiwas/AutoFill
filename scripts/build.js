@@ -1,97 +1,87 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-const env = process.argv[2] || 'dev';
-const configPath = path.join(__dirname, `../config/${env}.json`);
+// Configuration
+const DIST_DIR = path.join(__dirname, '../dist');
+const SRC_DIR = path.join(__dirname, '..');
+const FILES_TO_COPY = [
+  'manifest.json',
+  'background.js',
+  'content.js',
+  'popup.html',
+  'popup.css',
+  'popup.js',
+  'rules.html',
+  'rules.css',
+  'rules.js',
+  'storage.js',
+  'translations.js',
+  'pattern-matcher.js',
+  'rule-optimizer.js',
+  'cloud.js',
+  'icons',
+  '_locales'
+];
 
-if (!fs.existsSync(configPath)) {
-  console.error(`Config file not found: ${configPath}`);
-  process.exit(1);
-}
+function build(env) {
+  console.log(`Building for ${env}...`);
+  const outDir = path.join(DIST_DIR, env);
+  
+  // Create clean output directory
+  if (fs.existsSync(outDir)) {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(outDir, { recursive: true });
 
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-console.log(`Building for environment: ${env} (${config.extension_name})`);
-
-const rootDir = path.join(__dirname, '../');
-const distDir = path.join(__dirname, '../.plugin');
-
-let targetDir;
-
-if (env === 'prod') {
-    // --- PROD BUILD: Copy to .plugin ---
-    targetDir = distDir;
-    console.log(`Target: Distribution folder (${targetDir})`);
-
-    // 1. Clean dist dir (preserve screens)
-    if (fs.existsSync(distDir)) {
-      const files = fs.readdirSync(distDir);
-      files.forEach(file => {
-        if (file === 'screens') return; // Skip screens directory
-        const curPath = path.join(distDir, file);
-        fs.rmSync(curPath, { recursive: true, force: true });
-      });
+  // Copy files
+  FILES_TO_COPY.forEach(file => {
+    const src = path.join(SRC_DIR, file);
+    const dest = path.join(outDir, file);
+    
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dest, { recursive: true });
     } else {
-      fs.mkdirSync(distDir);
+      console.warn(`Warning: ${file} not found.`);
     }
+  });
 
-    // 2. Copy files
-    const ignoreList = [
-      '.git', '.gitignore', '.plugin', 'archive', 'config', 'scripts', 'tests', 
-      'node_modules', 'package.json', 'package-lock.json', 'manifest.template.json', 
-      'cloud.template.js', 'README.md', 'PRIVACY_POLICY.md', 'PRIVACY_JUSTIFICATIONS.md',
-      'manifest.json', 'cloud.js' // Don't copy generated files, we regenerate them
-    ];
-
-    function copyRecursive(src, dest) {
-      const stats = fs.statSync(src);
-      if (stats.isDirectory()) {
-        if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-        fs.readdirSync(src).forEach(child => {
-          if (!ignoreList.includes(child)) {
-            copyRecursive(path.join(src, child), path.join(dest, child));
-          }
-        });
-      } else {
-        fs.copyFileSync(src, dest);
+  // Process manifest based on env
+  const manifestPath = path.join(outDir, 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    
+    if (env === 'prod') {
+      // Remove 'DEV' suffix from name if present
+      manifest.name = manifest.name.replace(' (DEV)', '');
+    } else {
+      // Ensure DEV suffix
+      if (!manifest.name.includes('(DEV)')) {
+        manifest.name += ' (DEV)';
       }
     }
+    
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  }
 
-    fs.readdirSync(rootDir).forEach(child => {
-      if (!ignoreList.includes(child)) {
-        copyRecursive(path.join(rootDir, child), path.join(distDir, child));
-      }
-    });
-    console.log('Copied files to .plugin/');
-
-} else {
-    // --- DEV BUILD: Update Root ---
-    targetDir = rootDir;
-    console.log(`Target: Root folder (In-place update)`);
-    // No copying needed, just regenerating manifest/cloud.js
+  // Zip (requires 7-zip or zip installed, or we can skip for now)
+  // execSync(`7z a -tzip ${path.join(DIST_DIR, `autofill-plugin-${env}.zip`)} ${outDir}/*`);
+  
+  console.log(`Build ${env} complete at ${outDir}`);
 }
 
-// 3. Generate manifest.json
-const manifestTemplate = fs.readFileSync(path.join(rootDir, 'manifest.template.json'), 'utf8');
-let manifest = manifestTemplate
-  .replace('{{GOOGLE_CLIENT_ID}}', config.google_client_id)
-  .replace('{{EXTENSION_NAME}}', config.extension_name);
+const args = process.argv.slice(2);
+const targetEnv = args[0];
 
-fs.writeFileSync(path.join(targetDir, 'manifest.json'), manifest);
-console.log('Generated manifest.json');
+// Ensure dist exists
+if (!fs.existsSync(DIST_DIR)) {
+  fs.mkdirSync(DIST_DIR);
+}
 
-// 4. Generate cloud.js
-const cloudTemplate = fs.readFileSync(path.join(rootDir, 'cloud.template.js'), 'utf8');
-let cloud = cloudTemplate
-  .replace('{{GOOGLE_CLIENT_ID}}', config.google_client_id)
-  .replace('{{GOOGLE_CLIENT_SECRET}}', config.google_client_secret || '')
-  .replace('{{GOOGLE_AUTH_METHOD}}', config.google_auth_method);
-
-fs.writeFileSync(path.join(targetDir, 'cloud.js'), cloud);
-console.log('Generated cloud.js');
-
-console.log(`\nBuild complete! 🚀`);
-if (env === 'prod') {
-    console.log('Your release version is ready in: .plugin/');
+if (!targetEnv) {
+  // Default: Build both
+  build('dev');
+  build('prod');
 } else {
-    console.log('Your working directory is updated with dev config.');
+  build(targetEnv);
 }

@@ -419,9 +419,6 @@ function initElements() {
   elements.confirmImportPreview = document.getElementById('confirmImportPreview');
 
   // Tilgjengelige felt
-  elements.availableHeader = document.getElementById('availableHeader');
-  elements.availableContent = document.getElementById('availableContent');
-  elements.availableCount = document.getElementById('availableCount');
   elements.availableSearch = document.getElementById('availableSearch');
   elements.availableFieldsList = document.getElementById('availableFieldsList');
   elements.availableEmpty = document.getElementById('availableEmpty');
@@ -430,20 +427,6 @@ function initElements() {
   if (elements.sortBy) {
     elements.sortBy.value = currentSort;
   }
-}
-
-function initAccordion(header, content) {
-  if (!header || !content) return;
-  
-  header.addEventListener('click', () => {
-    const isHidden = content.style.display === 'none';
-    content.style.display = isHidden ? 'block' : 'none';
-    if (isHidden) {
-      header.classList.add('active');
-    } else {
-      header.classList.remove('active');
-    }
-  });
 }
 
 function toggleAdvancedSettingsPanel() {
@@ -466,9 +449,6 @@ function updateAdvancedToggleLabel() {
  * Legg til event listeners
  */
 function attachEventListeners() {
-  // Accordions
-  initAccordion(elements.availableHeader, elements.availableContent);
-
   // Søk og filtrering
   elements.searchInput.addEventListener('input', applyFilters);
   elements.filterEnabled.addEventListener('change', applyFilters);
@@ -502,23 +482,6 @@ function attachEventListeners() {
   }
   if (elements.forceFillBtn) {
     elements.forceFillBtn.addEventListener('click', handleForceFill);
-  }
-  const recordMacroBtn = document.getElementById('recordMacroBtn');
-  if (recordMacroBtn) {
-      recordMacroBtn.addEventListener('click', () => {
-          if (currentTab && currentTab.id) {
-              chrome.tabs.sendMessage(currentTab.id, { action: 'startRecording' }, (response) => {
-                  if (chrome.runtime.lastError) {
-                      console.warn('Start recording failed:', chrome.runtime.lastError);
-                      alert('Could not start recording. Refresh page?');
-                  } else {
-                      window.close();
-                  }
-              });
-          } else {
-              alert('No active tab found');
-          }
-      });
   }
   if (elements.toggleAdvancedSettings) {
     elements.toggleAdvancedSettings.addEventListener('click', toggleAdvancedSettingsPanel);
@@ -1605,34 +1568,20 @@ function renderRules() {
   if (sortedPartialMatches.length > 0) {
     const t = translations.current || translations.en;
     const partialMatchesSection = document.createElement('div');
-    partialMatchesSection.className = 'accordion partial-matches-accordion';
-    
-    const headerId = 'partialMatchesHeader';
-    const contentId = 'partialMatchesContent';
-    const titleText = t.pageRules?.partialHeader || 'Partial match (domain matches, but no fields found)';
-    
+    partialMatchesSection.className = 'partial-matches-section';
     partialMatchesSection.innerHTML = `
-      <div class="accordion-header" id="${headerId}">
-        <h3>${escapeHtml(titleText)} <span class="partial-matches-count">(${sortedPartialMatches.length})</span></h3>
-        <span class="arrow">▼</span>
-      </div>
-      <div class="accordion-content" id="${contentId}" style="display: none;">
-        <!-- Rules injected here -->
+      <div class="partial-matches-header">
+        <h3>${escapeHtml(t.pageRules?.partialHeader || 'Partial match (domain matches, but no fields found)')}</h3>
+        <span class="partial-matches-count">${sortedPartialMatches.length}</span>
       </div>
     `;
-    
-    const contentDiv = partialMatchesSection.querySelector(`#${contentId}`);
-    const headerDiv = partialMatchesSection.querySelector(`#${headerId}`);
 
     for (const rule of sortedPartialMatches) {
       const ruleElement = createRuleElement(rule, true, conflictSet.has(rule.id), conflictWinners);
-      contentDiv.appendChild(ruleElement);
+      partialMatchesSection.appendChild(ruleElement);
     }
 
     elements.rulesList.appendChild(partialMatchesSection);
-    
-    // Activate accordion logic
-    initAccordion(headerDiv, contentDiv);
   }
 }
 
@@ -3167,16 +3116,10 @@ function generateAiPrompt() {
  * Render tilgjengelige felter
  */
 function renderAvailableFields() {
-  const container = elements.availableFieldsList;
-  const empty = elements.availableEmpty;
-  
-  // Update count in header regardless of search/display state
-  if (elements.availableCount) {
-      elements.availableCount.textContent = `(${availableFields.length})`;
-  }
-
   if (!elements.availableSearch) return;
   const term = elements.availableSearch.value.toLowerCase();
+  const container = elements.availableFieldsList;
+  const empty = elements.availableEmpty;
 
   if (!container) return;
 

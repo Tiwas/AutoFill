@@ -845,6 +845,21 @@ function matchWildcard(text, pattern) {
 }
 
 /**
+ * Hjelpefunksjon for å sette verdi på React/Vue-inputs slik at state oppdateres
+ */
+function setNativeValue(element, value) {
+  const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+  const prototype = Object.getPrototypeOf(element);
+  const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+
+  if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+    prototypeValueSetter.call(element, value);
+  } else {
+    valueSetter.call(element, value);
+  }
+}
+
+/**
  * Fyll ut et felt basert på type
  */
 function fillField(field, value) {
@@ -852,17 +867,16 @@ function fillField(field, value) {
   const inputType = field.type ? field.type.toLowerCase() : '';
 
   try {
+    // Gi feltet fokus først (hjelper ofte med floating labels)
+    field.focus();
+
     if (tagName === 'select') {
-      // Select/dropdown - velg option med matchende verdi
       fillSelectField(field, value);
     } else if (inputType === 'checkbox') {
-      // Checkbox - sett checked basert på verdi
       fillCheckboxField(field, value);
     } else if (inputType === 'radio') {
-      // Radio button - sett checked
       fillRadioField(field, value);
     } else if (inputType === 'range') {
-      // Range - sett value (med numerisk validering)
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
         field.value = numValue;
@@ -870,19 +884,40 @@ function fillField(field, value) {
         field.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else if (field.isContentEditable) {
-      // ContentEditable - sett textContent
       field.textContent = value;
       field.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
-      // Standard input, textarea, date, time, color, etc. - sett value
-      // Støtter: text, email, password, search, tel, url, number,
-      //          date, datetime-local, time, week, month, color
-      field.value = value;
+      // Standard input handling (Text, Email, osv.)
+      
+      // 1. Sett verdien på "native" måte for å trigge React/Frameworks
+      setNativeValue(field, value);
+      
+      // 2. Send standard events
       field.dispatchEvent(new Event('input', { bubbles: true }));
       field.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // 3. Spesialhåndtering for "smarte" søkefelter (comboboxes)
+      const isCombobox = field.getAttribute('role') === 'combobox' || 
+                         field.getAttribute('aria-autocomplete') === 'list' ||
+                         field.getAttribute('aria-haspopup') === 'listbox';
+                         
+      if (isCombobox) {
+        // Simuler "Enter" for å velge det øverste resultatet
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+        field.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+      }
     }
+
+    // Fjern fokus (blur) til slutt for å trigge validering
+    field.blur();
+
   } catch (error) {
     console.error('Error filling field:', error);
+    // Fallback til standard metode hvis noe feiler
+    try {
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) {}
   }
 }
 

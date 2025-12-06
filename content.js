@@ -12,6 +12,7 @@ if (window.__autofillContentLoaded) {
 // Globale variabler
 let lastClickedElement = null;
 let autoFillRules = [];
+let executedMacros = new Set(); // Ny: Hindre loop ved makro-avspilling
 let debugMode = false;
 let autofillEnabled = true;
 let autofillDelayMs = 0;
@@ -138,6 +139,18 @@ const MacroRecorder = {
     // Ikke ta opp klikk på vår egen overlay
     if (MacroRecorder.overlay && MacroRecorder.overlay.contains(e.target)) return;
     
+    // Unngå doble klikk-registreringer (debounce)
+    const lastStep = this.steps[this.steps.length - 1];
+    const now = Date.now();
+    if (lastStep && lastStep.type === 'click' && (now - this.lastEventTime < 500)) {
+        // Sjekk om det er samme element (via selector)
+        const currentSelector = generateSelector(e.target);
+        if (lastStep.selector === currentSelector) {
+            debugLog('Ignorerer dobbeltklikk i opptak');
+            return;
+        }
+    }
+
     MacroRecorder.recordStep('click', e.target);
   },
 
@@ -245,11 +258,11 @@ const MacroPlayer = {
     
     if (!Array.isArray(steps)) return;
 
-    debugLog('Starting macro playback', steps.length, 'steps');
+    console.log('[AutoFill Macro] Starting playback with', steps.length, 'steps'); // Forced log
 
     for (const step of steps) {
-        // Vent angitt delay
-        const delay = Math.max(step.delay || 100, 50); // Minst 50ms
+        // Vent angitt delay (eller default 300ms for stabilitet)
+        const delay = Math.max(step.delay || 300, 100); 
         await new Promise(r => setTimeout(r, delay));
         
         const el = document.querySelector(step.selector);
@@ -521,10 +534,42 @@ function performAutoFill(force = false) {
   // 1. Sjekk for makroer først
   for (const rule of autoFillRules) {
       if (rule.fieldType === 'macro') {
-          debugLog('Fant makro-regel, kjører...', rule);
+          if (!force && executedMacros.has(rule.id)) {
+              continue;
+          }
+
           if (matchesCondition(rule, window.location.href, document.body)) {
-              MacroPlayer.play(rule.value);
-              markRuleAsUsed(rule.id);
+              // Sjekk om makroens start-element er synlig
+              let steps;
+              try {
+                  steps = typeof rule.value === 'string' ? JSON.parse(rule.value) : rule.value;
+              } catch(e) { continue; }
+
+              if (steps && steps.length > 0) {
+                  const firstSelector = steps[0].selector;
+                  const el = document.querySelector(firstSelector);
+                  
+                  // Er elementet synlig? (offsetParent er null hvis hidden)
+                  if (el && el.offsetParent !== null) {
+                      console.log('[AutoFill] Macro start element found & visible, running:', firstSelector);
+                      executedMacros.add(rule.id);
+                      
+                      const delay = parseInt(rule.delay) || 0;
+                      if (delay > 0) {
+                          console.log(`[AutoFill] Waiting ${delay}ms before executing macro...`);
+                          setTimeout(() => {
+                              MacroPlayer.play(steps);
+                              markRuleAsUsed(rule.id);
+                          }, delay);
+                      } else {
+                          MacroPlayer.play(steps);
+                          markRuleAsUsed(rule.id);
+                      }
+                  } else {
+                      // Debug log kun hvis vi er i debug mode for å unngå spam
+                      debugLog('[AutoFill] Macro start element not visible yet:', firstSelector);
+                  }
+              }
           }
       }
   }

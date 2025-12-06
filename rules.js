@@ -1072,6 +1072,7 @@ function openEditModal(ruleId) {
     const commentEl = document.getElementById('comment');
     if (commentEl) commentEl.value = rule.comment || '';
     document.getElementById('priority').value = rule.priority || 0;
+    document.getElementById('ruleDelay').value = rule.delay || 0;
     document.getElementById('conditionType').value = rule.conditionType || 'none';
     document.getElementById('conditionValue').value = rule.conditionValue || '';
     document.getElementById('enabled').checked = rule.enabled;
@@ -1111,6 +1112,7 @@ async function handleSaveRule(e) {
     value: document.getElementById('value').value,
     comment: document.getElementById('comment')?.value || '',
     priority: parseInt(document.getElementById('priority').value) || 0,
+    delay: parseInt(document.getElementById('ruleDelay').value) || 0,
     conditionType: document.getElementById('conditionType').value,
     conditionValue: document.getElementById('conditionValue').value.trim(),
     enabled: document.getElementById('enabled').checked,

@@ -28,13 +28,13 @@ function build(env) {
   console.log(`Building for ${env}...`);
   const outDir = path.join(DIST_DIR, env);
   
-  // Create clean output directory
+  // 1. Clean and create output directory
   if (fs.existsSync(outDir)) {
     fs.rmSync(outDir, { recursive: true, force: true });
   }
   fs.mkdirSync(outDir, { recursive: true });
 
-  // Copy files
+  // 2. Copy files
   FILES_TO_COPY.forEach(file => {
     const src = path.join(SRC_DIR, file);
     const dest = path.join(outDir, file);
@@ -46,7 +46,7 @@ function build(env) {
     }
   });
 
-  // Process manifest based on env
+  // 3. Process manifest based on env
   const manifestPath = path.join(outDir, 'manifest.json');
   if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -64,10 +64,34 @@ function build(env) {
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   }
 
-  // Zip (requires 7-zip or zip installed, or we can skip for now)
-  // execSync(`7z a -tzip ${path.join(DIST_DIR, `autofill-plugin-${env}.zip`)} ${outDir}/*`);
+  console.log(`Files copied to ${outDir}`);
+
+  // 4. Zip the output (Windows specific using PowerShell)
+  const zipName = `autofill-plugin-${env}.zip`;
+  const zipPath = path.join(DIST_DIR, zipName);
   
-  console.log(`Build ${env} complete at ${outDir}`);
+  // Remove existing zip if it exists
+  if (fs.existsSync(zipPath)) {
+    fs.unlinkSync(zipPath);
+  }
+
+  console.log(`Creating ${zipName}...`);
+  
+  try {
+    // Use PowerShell to zip because it's built-in on Windows. 
+    // Using full paths to avoid relative path issues.
+    // Note: Compress-Archive needs the *contents* of the directory, so we append \*
+    const absOutDir = path.resolve(outDir);
+    const absZipPath = path.resolve(zipPath);
+    
+    const command = `powershell -Command "Compress-Archive -Path '${absOutDir}\*' -DestinationPath '${absZipPath}' -Force"`;
+    
+    execSync(command, { stdio: 'inherit' });
+    console.log(`Successfully created ${zipName}`);
+  } catch (error) {
+    console.error(`Failed to zip ${env} build. Ensure PowerShell is available.`);
+    console.error(error.message);
+  }
 }
 
 const args = process.argv.slice(2);

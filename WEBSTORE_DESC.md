@@ -1,38 +1,45 @@
-# Chrome Web Store Listing
+# AutoFill Plugin - The Ultimate Form Automation Tool (Beta)
 
-## Short Description (Max 132 characters)
-Automate form filling with precision. Support for regex, profiles, and advanced field matching. Private, free, and open-source.
+**AutoFill Plugin** is a powerful, privacy-focused browser extension designed to automate form filling on websites. Whether you're a developer testing forms, a power user filling out repetitive data, or just want to save time, AutoFill has you covered.
 
-## Detailed Description
+> **🚧 BETA NOTICE & COMMUNITY REQUEST 🚧**
+> This plugin is a free, open-source hobby project developed in my spare time. It is currently in **Beta**.
+>
+> **Before giving a low rating:** If you encounter a bug or a feature doesn't work as expected (e.g., a specific website isn't filling correctly), please **contact me** or open an issue on GitHub. 
+>
+> Negative ratings discourage development. Constructive feedback, bug reports, and code contributions help keep this project alive and free for everyone!
+>
+> [**Report Issues & Contribute on GitHub**](https://github.com/Tiwas/AutoFill)
 
-**AutoFill Plugin: The Ultimate Form Automation Tool**
+## 🌟 New Features
 
-Tired of typing the same information over and over? AutoFill Plugin is a powerful, developer-friendly extension designed to automate form filling on any website with unmatched precision and flexibility.
+### 🎥 Macro Recorder (NEW!)
+Struggling with complex forms, dynamic menus, or "smart" search fields (like React/Vue dropdowns)? 
+*   **Record:** Click "Record", perform your actions (click, type, select), and stop.
+*   **Replay:** The plugin will repeat your exact steps automatically when the form appears.
+*   **Smart Wait:** The macro waits for elements to become visible before running, ensuring stability on slow-loading pages.
 
-Unlike basic autofill tools, this plugin gives you granular control. Whether you need simple wildcard matching or complex Regular Expressions (Regex), AutoFill Plugin handles it all.
+### ☁️ Cloud Sync & Backup (NEW!)
+*   **Google Drive & OneDrive Support:** Backup your rules to your personal cloud storage.
+*   **Sync:** Keep your rules synchronized across multiple computers.
+*   **Manual Control:** You decide when to push or pull data. No hidden background syncing.
 
-**🚀 Key Features:**
+## 🚀 Key Features
 
-*   **Smart Site Matching:** Trigger rules based on specific domains, subdomains, full URLs, or Regex patterns.
-*   **Advanced Field Targeting:** Target input fields by Name, ID, Placeholder text, or even CSS Selectors.
-*   **Multiple Profiles:** seamlessly switch between "Personal", "Work", or "Testing" profiles to keep your data organized.
-*   **Regex Support:** Use the full power of Regular Expressions for both site matching and field identification.
-*   **Variables:** Define global variables (like `{email}` or `{phone}`) to update multiple rules instantly.
-*   **Privacy First:** 100% Local. Your data is stored securely in your browser. No cloud sync, no tracking, no external servers.
-*   **Import/Export:** Easily backup your rules or share them via CSV.
+*   **Flexible Matching:** Match sites by Hostname, Domain, exact URL, or Regex.
+*   **Precise Targeting:** Target fields by `name`, `id`, `data-attributes`, `placeholder`, or CSS Selectors.
+*   **Profiles:** Switch easily between "Work", "Personal", or "Testing" profiles.
+*   **Variables:** Define global variables (e.g., `{email}`, `{phone}`) to update multiple rules at once.
+*   **Privacy First:** All data is stored locally on your device (unless you explicitly use Cloud Backup). No tracking, no ads.
+*   **Developer Friendly:** "Force Fill" mode to bypass checks, and detailed debug logging.
 
-**🛠️ Perfect for:**
+## 🤝 Support the Project
 
-*   **Developers & QA:** Rapidly fill test forms with varied data sets.
-*   **Power Users:** Automate repetitive data entry tasks on complex enterprise systems.
-*   **Everyone:** Speed up checkout flows, sign-ups, and daily browsing.
+If you find this tool useful, consider supporting its development:
 
-**📝 How to use:**
-Simply right-click on any field to add a rule, or fill out a form and choose "Add all filled fields" to save everything at once. Manage your rules in a clean, searchable dashboard.
+*   **Code:** Contribute fixes or features on GitHub.
+*   **Feedback:** Tell me what works and what doesn't.
+*   **Donate:** [Buy me a coffee](https://www.paypal.com/paypalme/tiwasno) to fuel late-night coding sessions.
 
-**Free & Open Source:**
-This project is a labor of love. It contains no ads, no bloatware, and respects your privacy.
-
-If you find this tool useful, consider supporting the development: https://www.paypal.com/paypalme/tiwasno
-
-**License:** Apache License 2.0
+---
+*Happy Autofilling!*

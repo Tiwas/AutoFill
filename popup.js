@@ -378,6 +378,7 @@ function initElements() {
   // Nye elementer for v0.3.0
   elements.elementType = document.getElementById('elementType');
   elements.priority = document.getElementById('priority');
+  elements.ruleDelay = document.getElementById('ruleDelay');
   elements.conditionType = document.getElementById('conditionType');
   elements.conditionValue = document.getElementById('conditionValue');
   elements.optimizerTitle = document.getElementById('optimizerTitle');

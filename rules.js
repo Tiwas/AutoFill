@@ -47,7 +47,23 @@ function initElements() {
   elements.mergeFilteredBtn = document.getElementById('mergeFilteredBtn');
   elements.cloudBackupBtn = document.getElementById('cloudBackupBtn');
   elements.cloudRestoreBtn = document.getElementById('cloudRestoreBtn');
+  elements.cloudSettingsBtn = document.getElementById('cloudSettingsBtn');
+  elements.cloudSettingsModal = document.getElementById('cloudSettingsModal');
+  elements.closeCloudSettingsModal = document.getElementById('closeCloudSettingsModal');
+  elements.authGoogleBtn = document.getElementById('authGoogleBtn');
+  elements.authOneDriveBtn = document.getElementById('authOneDriveBtn');
+  elements.googleClientId = document.getElementById('googleClientId');
+  elements.onedriveClientId = document.getElementById('onedriveClientId');
+  elements.onedriveTenant = document.getElementById('onedriveTenant');
+  elements.extensionIdDisplay = document.getElementById('extensionIdDisplay');
   elements.floatingActions = document.getElementById('floatingActions');
+  
+  elements.cloudRestoreModal = document.getElementById('cloudRestoreModal');
+  elements.closeCloudRestoreModal = document.getElementById('closeCloudRestoreModal');
+  elements.cloudRestoreList = document.getElementById('cloudRestoreList');
+  elements.cloudRestoreLoading = document.getElementById('cloudRestoreLoading');
+  elements.localRestoreBtn = document.getElementById('localRestoreBtn');
+  
   elements.aiAssistBtn = document.getElementById('aiAssistBtn');
   elements.optimizeBtn = document.getElementById('optimizeBtn');
   elements.variablesBtn = document.getElementById('variablesBtn');
@@ -157,19 +173,20 @@ function attachEvents() {
   elements.exportSelectedBtn.addEventListener('click', exportSelected);
   elements.importRulesBtn.addEventListener('click', () => elements.importFile.click());
   elements.importFile.addEventListener('change', (ev) => handleImport(ev, 'import'));
-  if (elements.cloudRestoreBtn) elements.cloudRestoreBtn.addEventListener('click', () => elements.importFile && elements.importFile.click());
-  if (elements.validateRulesBtn) elements.validateRulesBtn.addEventListener('click', () => elements.validateFile && elements.validateFile.click());
-  if (elements.validateFile) elements.validateFile.addEventListener('change', (ev) => handleImport(ev, 'validate'));
-  elements.refreshBtn.addEventListener('click', loadRules);
-  elements.openPopupBtn.addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+  
+  // Smart Cloud Actions
+  if (elements.cloudRestoreBtn) elements.cloudRestoreBtn.addEventListener('click', handleSmartRestore);
+  if (elements.cloudBackupBtn) elements.cloudBackupBtn.addEventListener('click', handleSmartBackup);
+  
+  if (elements.closeCloudRestoreModal) elements.closeCloudRestoreModal.addEventListener('click', () => elements.cloudRestoreModal.style.display = 'none');
+  if (elements.localRestoreBtn) elements.localRestoreBtn.addEventListener('click', () => {
+      elements.cloudRestoreModal.style.display = 'none';
+      elements.importFile.click();
   });
-  if (elements.mergeFilteredBtn) {
-    elements.mergeFilteredBtn.addEventListener('click', mergeFilteredRules);
-  }
-  if (elements.cloudBackupBtn) {
-    elements.cloudBackupBtn.addEventListener('click', handleLocalBackup);
-  }
+
+  if (elements.cloudSettingsBtn) elements.cloudSettingsBtn.addEventListener('click', openCloudSettings);
+  if (elements.closeCloudSettingsModal) elements.closeCloudSettingsModal.addEventListener('click', closeCloudSettings);
+  if (elements.authGoogleBtn) elements.authGoogleBtn.addEventListener('click', handleGoogleAuth);
   if (elements.closeOptimizer) elements.closeOptimizer.addEventListener('click', hideOptimizer);
 
   // LLM optimization
@@ -269,19 +286,17 @@ function handleSelectAll(e) {
 }
 
 function toggleSelectMode() {
-  selectMode = !selectMode;
-  selectedRules.clear();
-  if (elements.selectModeBtn && TRANSLATIONS.current) {
-    elements.selectModeBtn.textContent = selectMode
-      ? (TRANSLATIONS.current.buttons?.cancel || 'Avbryt')
-      : (TRANSLATIONS.current.buttons?.selectModeBtn || 'Velg flere');
-  }
-  if (elements.selectionBar) {
-    elements.selectionBar.style.display = selectMode ? 'flex' : 'none';
+  if (selectedRules.size > 0) {
+    // If items selected, clear them (this effectively exits select mode via updateSelectionUi)
+    selectedRules.clear();
+  } else {
+    // If nothing selected, user wants to enter mode manually?
+    // Or maybe "Select All"? Let's just toggle the boolean for manual entry if needed,
+    // but mostly this button acts as "Cancel" now when active.
+    selectMode = !selectMode;
   }
   updateSelectionUi();
   renderRules();
-  updateStats();
 }
 
 async function loadRules() {
@@ -386,8 +401,27 @@ function updateSelectionUi() {
     const allVisibleSelected = filteredRules.length > 0 && filteredRules.every(r => selectedRules.has(r.id));
     elements.selectAllCheckbox.checked = allVisibleSelected;
   }
+  
+  // Auto-toggle select mode based on selection
+  const hasSelection = selectedRules.size > 0;
+  selectMode = hasSelection; // Sync state variable
+  
+  // Toggle bars
   if (elements.selectionBar) {
-    elements.selectionBar.style.display = selectMode ? 'flex' : 'none';
+    elements.selectionBar.style.display = hasSelection ? 'flex' : 'none';
+  }
+  if (elements.floatingActions) {
+      elements.floatingActions.style.display = hasSelection ? 'none' : 'flex';
+  }
+  
+  // Update Select All text if needed (e.g. "Cancel" vs "Select All")
+  if (elements.selectModeBtn) {
+      // We can reuse this button as a manual toggle if user wants to enter mode without selecting
+      // or just hide it if auto-detect is preferred. Let's keep it as "Select Multiple" for now
+      // but maybe change text to "Cancel Selection" if active.
+      elements.selectModeBtn.textContent = hasSelection ? 
+        (TRANSLATIONS.current?.buttons?.cancel || 'Cancel') : 
+        (TRANSLATIONS.current?.buttons?.selectModeBtn || 'Select Multiple');
   }
 }
 
@@ -500,22 +534,68 @@ function renderRules() {
     const hasSearch = !!(elements.searchInput.value.trim());
     Object.keys(bySite).sort().forEach(site => {
       const section = document.createElement('div');
-      const shouldExpand = hasSearch; // åpne paneler når det er søk/filtrering aktivt
+      
+      // Default collapsed, unless explicitly opened or search is active
+      const storageKey = `group_open_${site}`;
+      const isStoredOpen = sessionStorage.getItem(storageKey) === 'true';
+      const shouldExpand = hasSearch || isStoredOpen;
+      
       section.className = `rule-group ${shouldExpand ? '' : 'collapsed'}`.trim();
 
       const header = document.createElement('div');
       header.className = 'rule-group-header';
+      
+      // Group Checkbox
+      const groupCheckbox = document.createElement('input');
+      groupCheckbox.type = 'checkbox';
+      groupCheckbox.className = 'checkbox group-checkbox';
+      // Check if all visible rules in this group are selected
+      const groupRuleIds = bySite[site].map(r => r.id);
+      const allSelected = groupRuleIds.every(id => selectedRules.has(id));
+      groupCheckbox.checked = allSelected;
+      
+      groupCheckbox.addEventListener('click', (e) => {
+          e.stopPropagation(); // Don't toggle collapse
+          const checked = e.target.checked;
+          groupRuleIds.forEach(id => {
+              if (checked) selectedRules.add(id);
+              else selectedRules.delete(id);
+          });
+          updateSelectionUi();
+          renderRules(); // Re-render to update individual checkboxes
+      });
+
       const title = document.createElement('h3');
       title.textContent = site;
+      
       const toggle = document.createElement('span');
       toggle.className = 'rule-group-toggle';
       toggle.textContent = shouldExpand ? '−' : '+';
-      header.appendChild(title);
-      header.appendChild(toggle);
-      header.addEventListener('click', () => {
-        const isCollapsed = section.classList.contains('collapsed');
-        section.classList.toggle('collapsed', !isCollapsed);
-        toggle.textContent = isCollapsed ? '−' : '+';
+      
+      // Container for title/toggle to separate from checkbox
+      const titleContainer = document.createElement('div');
+      titleContainer.style.display = 'flex';
+      titleContainer.style.alignItems = 'center';
+      titleContainer.style.gap = '10px';
+      titleContainer.style.flex = '1';
+      
+      titleContainer.appendChild(title);
+      titleContainer.appendChild(toggle);
+
+      header.appendChild(groupCheckbox);
+      header.appendChild(titleContainer);
+      
+      header.addEventListener('click', (e) => {
+        if (e.target === groupCheckbox) return; 
+        
+        const wasCollapsed = section.classList.contains('collapsed');
+        const newCollapsed = !wasCollapsed; // Toggle logic
+        
+        section.classList.toggle('collapsed', newCollapsed);
+        toggle.textContent = newCollapsed ? '+' : '−';
+        
+        // Lagre at den er ÅPEN (hvis den ikke er collapsed)
+        sessionStorage.setItem(storageKey, !newCollapsed);
       });
 
       const list = document.createElement('div');
@@ -2105,4 +2185,228 @@ function applyTranslations() {
     if (submitBtn && t.variables?.add) submitBtn.textContent = t.variables.add;
   });
 }
+
+// --- Cloud Settings ---
+
+async function openCloudSettings() {
+  if (elements.cloudSettingsModal) elements.cloudSettingsModal.style.display = 'flex';
+  if (elements.extensionIdDisplay) elements.extensionIdDisplay.textContent = chrome.runtime.id;
+  
+  await loadCloudSettings();
+}
+
+function closeCloudSettings() {
+  if (elements.cloudSettingsModal) elements.cloudSettingsModal.style.display = 'none';
+}
+
+async function loadCloudSettings() {
+  const response = await chrome.runtime.sendMessage({ action: 'getCloudConfig' });
+  const config = response.success ? response.config : {};
+  
+  if (elements.googleClientId) elements.googleClientId.value = config.google?.clientId || '';
+  if (elements.onedriveClientId) elements.onedriveClientId.value = config.onedrive?.clientId || '';
+  if (elements.onedriveTenant) elements.onedriveTenant.value = config.onedrive?.tenant || '';
+  
+  // Check status (mock check based on token existence)
+  // In a real app we might check token validity
+}
+
+async function handleGoogleAuth() {
+  const clientIdInput = elements.googleClientId.value.trim();
+  // If input is empty, use a placeholder to indicate "enabled" so smart backup detects it.
+  // The actual auth logic in cloud.js will use the hardcoded fallback ID.
+  const clientIdToSave = clientIdInput || 'managed_by_extension';
+  
+  // Save config first
+  await chrome.runtime.sendMessage({ 
+    action: 'saveCloudConfig', 
+    provider: 'google', 
+    config: { clientId: clientIdToSave } 
+  });
+
+  updateStatus('googleStatus', 'Connecting...');
+  
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'cloudAuth', provider: 'google' });
+    if (res.success) {
+      updateStatus('googleStatus', 'Connected!', 'green');
+    } else {
+      updateStatus('googleStatus', 'Failed: ' + res.error, 'red');
+    }
+  } catch (e) {
+    updateStatus('googleStatus', 'Error: ' + e.message, 'red');
+  }
+}
+
+async function handleOneDriveAuth() {
+  const clientId = elements.onedriveClientId.value.trim();
+  const tenant = elements.onedriveTenant.value.trim();
+  
+  if (!clientId) {
+    alert('Please enter Client ID for OneDrive');
+    return;
+  }
+
+  // Save config
+  await chrome.runtime.sendMessage({ 
+    action: 'saveCloudConfig', 
+    provider: 'onedrive', 
+    config: { clientId, tenant }
+  });
+
+  updateStatus('onedriveStatus', 'Connecting...');
+
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'cloudAuth', provider: 'onedrive' });
+    if (res.success) {
+      updateStatus('onedriveStatus', 'Connected!', 'green');
+    } else {
+      updateStatus('onedriveStatus', 'Failed: ' + res.error, 'red');
+    }
+  } catch (e) {
+    updateStatus('onedriveStatus', 'Error: ' + e.message, 'red');
+  }
+}
+
+function updateStatus(elementId, text, color) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.textContent = text;
+    if (color) el.style.color = color;
+    else el.style.color = '';
+  }
+}
+
+// --- Smart Cloud Logic ---
+
+async function handleSmartBackup() {
+  const configRes = await chrome.runtime.sendMessage({ action: 'getCloudConfig' });
+  const config = configRes.config || {};
+  
+  // Check if Google is "enabled" (has clientId placeholder or real ID)
+  const hasGoogle = config.google && config.google.clientId;
+  
+  if (!hasGoogle) {
+    // No cloud setup, use local
+    handleLocalBackup();
+    return;
+  }
+  
+  // Default to Google
+  const provider = 'google';
+  const confirmMsg = `Upload backup to Google Drive?`;
+  if (!confirm(confirmMsg)) return;
+  
+  const csv = buildCSV(allRules);
+  
+  try {
+    const res = await chrome.runtime.sendMessage({ 
+      action: 'cloudBackup', 
+      provider, 
+      csv 
+    });
+    
+    if (res.success) {
+      alert(`Backup successfully uploaded to Google Drive!\nFile: ${res.fileName}`);
+    } else {
+      alert('Backup upload failed: ' + res.error);
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function handleSmartRestore() {
+  const configRes = await chrome.runtime.sendMessage({ action: 'getCloudConfig' });
+  const config = configRes.config || {};
+  
+  const hasGoogle = config.google && config.google.clientId;
+  
+  if (!hasGoogle) {
+    // No cloud, open local file
+    elements.importFile.click();
+    return;
+  }
+  
+  const provider = 'google';
+  
+  elements.cloudRestoreModal.style.display = 'flex';
+  elements.cloudRestoreList.innerHTML = '';
+  elements.cloudRestoreLoading.style.display = 'block';
+  
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'cloudListBackups', provider });
+    elements.cloudRestoreLoading.style.display = 'none';
+    
+    if (!res.success) {
+      elements.cloudRestoreList.textContent = 'Error listing files: ' + res.error;
+      return;
+    }
+    
+    if (!res.files || res.files.length === 0) {
+      elements.cloudRestoreList.textContent = 'No AutoFill backups found in ' + provider + '.';
+      return;
+    }
+    
+    res.files.forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'backup-item';
+      item.style.padding = '10px';
+      item.style.borderBottom = '1px solid #eee';
+      item.style.display = 'flex';
+      item.style.justifyContent = 'space-between';
+      item.style.alignItems = 'center';
+      
+      const date = new Date(file.modifiedTime).toLocaleString();
+      item.innerHTML = `
+        <div>
+          <div style="font-weight:bold;">${file.name}</div>
+          <div style="font-size:0.9em;color:#666;">${date}</div>
+        </div>
+        <button class="btn btn-small btn-primary">Restore</button>
+      `;
+      
+      item.querySelector('button').addEventListener('click', () => performCloudRestore(provider, file.id));
+      elements.cloudRestoreList.appendChild(item);
+    });
+    
+  } catch (e) {
+    elements.cloudRestoreLoading.style.display = 'none';
+    elements.cloudRestoreList.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function performCloudRestore(provider, fileId) {
+  const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
+  elements.cloudRestoreModal.style.display = 'none';
+  
+  const msg = 'Downloading backup...';
+  // Could add a toast here
+  
+  try {
+    const res = await chrome.runtime.sendMessage({ 
+      action: 'cloudDownloadBackup', 
+      provider, 
+      fileId 
+    });
+    
+    if (!res.success) {
+      alert('Download failed: ' + res.error);
+      return;
+    }
+    
+    // Use existing CSV import logic
+    const analysis = analyzeCsvForImport(res.csv, allRules);
+    if (analysis.error) {
+      alert(analysis.error);
+      return;
+    }
+    showImportPreviewModal(analysis, 'import');
+    
+  } catch (e) {
+    alert('Error during restore: ' + e.message);
+  }
+}
+
+
 

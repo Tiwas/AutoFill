@@ -321,6 +321,80 @@ header h1 {
   color: #6b7280;
 }
 
+/* Accordion Styles */
+.accordion {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  margin-bottom: 16px;
+}
+
+.accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.accordion-header:hover {
+  background: #f3f4f6;
+}
+
+.accordion-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0;
+}
+
+.accordion-header .arrow {
+  font-size: 10px;
+  color: #6b7280;
+  transition: transform 0.3s ease;
+}
+
+.accordion-header.active .arrow {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+}
+
+/* Specific tweaks for Available Fields inside Accordion */
+.available-fields-accordion .accordion-header {
+    background: #f0f9ff; /* Light blue tint */
+}
+
+.available-fields-accordion .accordion-header h3 {
+    color: #1e40af;
+}
+
+.available-toolbar {
+    margin-bottom: 12px;
+}
+
+/* Partial Matches Section (overriding previous styles) */
+.partial-matches-accordion {
+    margin-top: 24px;
+    border-color: #e5e7eb;
+}
+
+.partial-matches-accordion .accordion-header {
+    background: #fff7ed; /* Light orange tint */
+}
+
+.partial-matches-accordion .accordion-header h3 {
+    color: #9a3412;
+}
+
 /* Rules section */
 .rules-section {
   flex: 1;

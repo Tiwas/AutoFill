@@ -23,6 +23,7 @@
         <button id="validateRulesBtn" class="btn btn-secondary">Validate</button>
         <button id="cloudBackupBtn" class="btn btn-secondary">Backup</button>
         <button id="cloudRestoreBtn" class="btn btn-secondary">Restore backup</button>
+        <button id="cloudSettingsBtn" class="btn btn-secondary">Cloud Settings</button>
         <button id="openPopupBtn" class="btn btn-secondary">Open popup</button>
       </div>
     </header>
@@ -237,6 +238,7 @@
               <option value="name">Name attribute</option>
               <option value="id">ID attribute</option>
               <option value="placeholder">Placeholder</option>
+              <option value="aria-label">Aria-Label</option>
               <option value="selector">CSS selector (avansert)</option>
             </select>
             <small id="fieldTypeHint">How the field is identified</small>
@@ -346,6 +348,50 @@
       </div>
     </div>
   </div>
+  <div id="cloudSettingsModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Cloud Backup Settings</h2>
+        <button class="modal-close" id="closeCloudSettingsModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Configure your cloud providers to enable backup and sync.</p>
+        
+        <div class="settings-box">
+          <h3>Google Drive</h3>
+          <p class="subtitle">Uses Chrome Identity API (requires manifest update for best experience) or Web Flow.</p>
+          <div class="form-group">
+            <label for="googleClientId">Client ID (Optional if using Manifest)</label>
+            <input type="text" id="googleClientId" placeholder="apps.googleusercontent.com" />
+          </div>
+          <button id="authGoogleBtn" class="btn btn-primary">Connect Google Drive</button>
+          <span id="googleStatus" class="status-text">Not connected</span>
+        </div>
+
+        <div style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 4px; font-size: 0.9em;">
+          <strong>Setup Info:</strong><br>
+          Redirect URI for setup: <code>https://<span id="extensionIdDisplay"></span>.chromiumapp.org/</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cloudRestoreModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Restore from Cloud</h2>
+        <button class="modal-close" id="closeCloudRestoreModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="cloudRestoreLoading" style="display:none;">Loading backups...</div>
+        <div id="cloudRestoreList" class="backup-list"></div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+            <button id="localRestoreBtn" class="btn btn-secondary">Or upload local CSV file</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="importPreviewModal" class="modal" style="display: none;">
     <div class="modal-content">
       <div class="modal-header">

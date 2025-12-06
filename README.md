@@ -9,6 +9,8 @@
 ### 🚀 Smart Automation
 *   **Flexible Site Matching:** Trigger rules based on Hostname, Domain, specific URLs, or Regex patterns.
 *   **Precise Field Targeting:** Identify fields by `name`, `id`, `placeholder`, or advanced CSS `selectors`.
+*   **Deep Scanning:** Works inside **iframes** (even `about:blank`) and **Shadow DOM** to find fields anywhere.
+*   **Smart Fallback:** Automatically generates robust CSS selectors for fields that lack ID or names, ensuring even "unfillable" forms can be automated.
 *   **Pattern Matching:** Use Wildcards (`*`, `?`) for simple matching or full **Regular Expressions** for power users.
 
 ### 👤 Profiles

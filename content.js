@@ -198,6 +198,26 @@ function isEditableElement(element) {
 }
 
 /**
+ * Hent effektiv URL/hostname (håndterer about:blank/srcdoc ved å sjekke parent)
+ */
+function getEffectiveLocation() {
+  let href = window.location.href;
+  let hostname = window.location.hostname;
+
+  if (href === 'about:blank' || href === 'about:srcdoc' || !hostname) {
+    try {
+      if (window.parent !== window) {
+        href = window.parent.location.href;
+        hostname = window.parent.location.hostname;
+      }
+    } catch (e) {
+      // Cross-origin blokkering, vi må bruke det vi har
+    }
+  }
+  return { href, hostname };
+}
+
+/**
  * Hent regler for gjeldende side
  */
 async function loadRulesForCurrentSite(profileId = null) {
@@ -207,9 +227,11 @@ async function loadRulesForCurrentSite(profileId = null) {
       showScanToast('scanning');
     }
 
+    const loc = getEffectiveLocation();
+
     const response = await chrome.runtime.sendMessage({
       action: 'getRulesForSite',
-      url: window.location.href,
+      url: loc.href,
       profileId: profileId
     });
 
@@ -576,52 +598,68 @@ function showScanToast(stage, rulesCount = 0, fullMatches = 0, partialMatches = 
 }
 
 /**
- * Finn alle redigerbare felt på siden
+ * Finn alle redigerbare felt på siden (inkludert Shadow DOM)
  */
-function findAllEditableFields() {
+function findAllEditableFields(root = document) {
   const fields = [];
 
-  // Input-felt (text, email, password, date, etc.)
-  const textInputs = document.querySelectorAll(
-    'input[type="text"], ' +
-    'input[type="email"], ' +
-    'input[type="password"], ' +
-    'input[type="search"], ' +
-    'input[type="tel"], ' +
-    'input[type="url"], ' +
-    'input[type="number"], ' +
-    'input[type="date"], ' +
-    'input[type="datetime-local"], ' +
-    'input[type="time"], ' +
-    'input[type="week"], ' +
-    'input[type="month"], ' +
-    'input[type="color"], ' +
-    'input[type="range"], ' +
-    'input:not([type])'
+  // Finn felter i gjeldende rot
+  const inputs = root.querySelectorAll(
+    'input, select, textarea, [contenteditable="true"]'
   );
-  fields.push(...Array.from(textInputs));
+  
+  // Filtrer for sikkerhets skyld (querySelectorAll tar med alle input-typer)
+  for (const input of inputs) {
+    if (isEditableElement(input)) {
+        fields.push(input);
+    }
+  }
 
-  // Checkbox-felt
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  fields.push(...Array.from(checkboxes));
-
-  // Radio button-felt
-  const radios = document.querySelectorAll('input[type="radio"]');
-  fields.push(...Array.from(radios));
-
-  // Select-felt (dropdown)
-  const selects = document.querySelectorAll('select');
-  fields.push(...Array.from(selects));
-
-  // Textareas
-  const textareas = document.querySelectorAll('textarea');
-  fields.push(...Array.from(textareas));
-
-  // ContentEditable elementer
-  const contentEditables = document.querySelectorAll('[contenteditable="true"]');
-  fields.push(...Array.from(contentEditables));
+  // Traverser Shadow DOM
+  // querySelectorAll('*') kan være tungt på store sider, men nødvendig for å finne shadow roots
+  // uten å vite hvor de er. En optimalisering kunne være å kun lete i kjente containere.
+  const allElements = root.querySelectorAll('*');
+  for (const el of allElements) {
+    if (el.shadowRoot) {
+      fields.push(...findAllEditableFields(el.shadowRoot));
+    }
+  }
 
   return fields;
+}
+
+/**
+ * Generer en unik CSS-selector for et element
+ */
+function generateSelector(el) {
+  if (!el || el.nodeType !== 1) return '';
+  
+  const path = [];
+  while (el && el.nodeType === 1) {
+    let selector = el.tagName.toLowerCase();
+    
+    if (el.id) {
+      selector = '#' + el.id;
+      path.unshift(selector);
+      break; // ID er unikt nok, vi trenger ikke gå lenger opp
+    }
+    
+    // Hvis elementet har søsken av samme type, legg til nth-of-type
+    let sibling = el;
+    let count = 1;
+    while (sibling = sibling.previousElementSibling) {
+      if (sibling.tagName.toLowerCase() === selector) count++;
+    }
+    
+    if (count > 1) {
+      selector += ':nth-of-type(' + count + ')';
+    }
+    
+    path.unshift(selector);
+    el = el.parentElement;
+  }
+  
+  return path.join(' > ');
 }
 
 /**
@@ -630,10 +668,15 @@ function findAllEditableFields() {
 function getFieldIdentifier(field) {
   const fieldType = getElementType(field);
 
-  // Prioriter: name > id > placeholder
+  // Prioriter: name > id > aria-label > placeholder
   if (field.name) return { type: 'name', value: field.name, fieldType: fieldType };
   if (field.id) return { type: 'id', value: field.id, fieldType: fieldType };
+  if (field.getAttribute('aria-label')) return { type: 'aria-label', value: field.getAttribute('aria-label'), fieldType: fieldType };
   if (field.placeholder) return { type: 'placeholder', value: field.placeholder, fieldType: fieldType };
+
+  // Fallback: Generer selector hvis ingen andre attributter finnes
+  const selector = generateSelector(field);
+  if (selector) return { type: 'selector', value: selector, fieldType: fieldType };
 
   return null;
 }
@@ -672,6 +715,7 @@ function findMatchingRule(field, identifier) {
       continue;
     }
 
+    // Sjekk selector-regler
     if (rule.fieldType === 'selector') {
       try {
         if (field.matches && field.matches(rule.fieldPattern)) {
@@ -683,11 +727,14 @@ function findMatchingRule(field, identifier) {
       continue;
     }
 
-    if (!identifier) continue;
+    // Sjekk attributt-baserte regler direkte på feltet
+    let fieldValue = null;
+    if (rule.fieldType === 'name') fieldValue = field.name;
+    else if (rule.fieldType === 'id') fieldValue = field.id;
+    else if (rule.fieldType === 'placeholder') fieldValue = field.placeholder;
+    else if (rule.fieldType === 'aria-label') fieldValue = field.getAttribute('aria-label');
 
-    if (rule.fieldType !== identifier.type) continue;
-
-    if (matchPattern(identifier.value, rule.fieldPattern, rule.fieldUseRegex)) {
+    if (fieldValue && matchPattern(fieldValue, rule.fieldPattern, rule.fieldUseRegex)) {
       best = pickBetterRule(best, rule);
     }
   }
@@ -935,10 +982,13 @@ function observeDOMChanges() {
     }
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  const target = document.body || document.documentElement;
+  if (target) {
+    observer.observe(target, {
+      childList: true,
+      subtree: true
+    });
+  }
 }
 
 /**
@@ -1146,12 +1196,16 @@ function handleGetFieldInfo(sendResponse) {
     return;
   }
 
+  const loc = getEffectiveLocation();
+
   const field = {
     type: identifier.type,
     identifier: identifier.value,
     value: getFieldValue(lastClickedElement),
     fieldType: identifier.fieldType,
-    tagName: lastClickedElement.tagName.toLowerCase()
+    tagName: lastClickedElement.tagName.toLowerCase(),
+    hostname: loc.hostname,
+    url: loc.href
   };
 
   sendResponse({ success: true, field });
@@ -1204,7 +1258,9 @@ function handleGetAllFilledFields(sendResponse) {
       identifier: identifier.value,
       value: value,
       fieldType: identifier.fieldType,
-      tagName: field.tagName.toLowerCase()
+      tagName: field.tagName.toLowerCase(),
+      hostname: getEffectiveLocation().hostname,
+      url: getEffectiveLocation().href
     });
   }
 

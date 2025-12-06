@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node tests/run-tests.js"
+    "test": "node tests/run-tests.js",
+    "build:dev": "node scripts/build.js dev",
+    "build:prod": "node scripts/build.js prod"
   }
 }

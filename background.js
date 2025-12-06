@@ -4,7 +4,7 @@
  */
 
 // Importer nødvendige moduler
-importScripts('storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js');
+importScripts('storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js', 'cloud.js');
 
 const CONTEXT_MENU_SET_PROFILE_PARENT = 'autofill_set_profile_parent';
 const CONTEXT_MENU_SET_PROFILE_PREFIX = 'autofill_set_profile_';
@@ -12,10 +12,6 @@ const CONTEXT_MENU_SET_PROFILE_PREFIX = 'autofill_set_profile_';
 // Context menu IDs
 const CONTEXT_MENU_ADD_FIELD = 'autofill_add_field';
 const CONTEXT_MENU_ADD_ALL = 'autofill_add_all';
-
-// Cloud backup storage keys
-const CLOUD_CONFIG_KEY = 'cloudConfig';
-const CLOUD_TOKENS_KEY = 'cloudTokens';
 
 /**
  * Initialiser extension ved installasjon
@@ -39,8 +35,12 @@ chrome.runtime.onStartup.addListener(() => {
  * Lytt på tab-endringer for å oppdatere badge
  */
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const tab = await chrome.tabs.get(activeInfo.tabId);
-  await updateBadgeForTab(activeInfo.tabId, tab.url);
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    await updateBadgeForTab(activeInfo.tabId, tab.url);
+  } catch (e) {
+    // Tab might be closed immediately
+  }
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -108,7 +108,7 @@ async function createContextMenus() {
     // Fyll ut som profil (Parent)
     chrome.contextMenus.create({
         id: 'autofill_fill_as_parent',
-        title: cm.fillAs || 'Fyll ut som...',
+        title: cm.fillAs || 'Fyll ut som...', 
         contexts: ['page', 'editable']
     });
 
@@ -305,7 +305,7 @@ function checkRuleMatchesFields(rule, fields) {
         matches = true;
       } else {
         const regexPattern = rule.fieldPattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/[.+^${}()|[\\]/g, '\\$&')
           .replace(/\*/g, '.*')
           .replace(/\?/g, '.');
         try {
@@ -376,11 +376,16 @@ async function updateBadgeWithCounts(tabId, fullMatches, partialMatches) {
 async function showAddFieldDialog(field, tabId) {
   // Hent gjeldende URL
   const tab = await chrome.tabs.get(tabId);
-  const url = new URL(tab.url);
+  let hostname = new URL(tab.url).hostname;
+
+  // Bruk frame hostname hvis tilgjengelig (for iframes)
+  if (field.hostname) {
+    hostname = field.hostname;
+  }
 
   // Opprett regel basert på feltinformasjon
   const rule = {
-    sitePattern: url.hostname,
+    sitePattern: hostname,
     siteMatchType: 'host',
     elementType: field.fieldType || 'text',
     fieldType: field.type || 'name',
@@ -397,7 +402,7 @@ async function showAddFieldDialog(field, tabId) {
     type: 'basic',
     iconUrl: 'icons/icon48.png',
     title: 'AutoFill - Regel lagt til',
-    message: `Felt "${field.identifier}" på ${url.hostname} er lagt til`
+    message: `Felt "${field.identifier}" på ${hostname} er lagt til`
   });
 
   console.log('Rule added:', savedRule);
@@ -411,11 +416,16 @@ async function showAddFieldDialog(field, tabId) {
 async function showAddMultipleFieldsDialog(fields, tabId) {
   // Hent gjeldende URL
   const tab = await chrome.tabs.get(tabId);
-  const url = new URL(tab.url);
+  let hostname = new URL(tab.url).hostname;
+
+  // Bruk frame hostname hvis tilgjengelig (anta at alle felt er fra samme frame)
+  if (fields.length > 0 && fields[0].hostname) {
+    hostname = fields[0].hostname;
+  }
 
   // Opprett regler for alle feltene
   const rules = fields.map(field => ({
-    sitePattern: url.hostname,
+    sitePattern: hostname,
     siteMatchType: 'host',
     elementType: field.fieldType || 'text',
     fieldType: field.type || 'name',
@@ -434,7 +444,7 @@ async function showAddMultipleFieldsDialog(fields, tabId) {
     type: 'basic',
     iconUrl: 'icons/icon48.png',
     title: 'AutoFill - Regler lagt til',
-    message: `${fields.length} felt på ${url.hostname} er lagt til`
+    message: `${fields.length} felt på ${hostname} er lagt til`
   });
 
   console.log(`${fields.length} rules added`);
@@ -553,7 +563,14 @@ async function handleGetRulesForSite(url, profileId = null) {
  * Send melding til tab, injiser content script om nødvendig
  */
 async function sendMessageWithFallback(tabId, message, frameId) {
-  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  let tab = null;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch (e) {
+    // Tab is likely closed or inaccessible
+    return { success: false, error: 'Tab not found or closed' };
+  }
+  
   const url = tab && tab.url ? tab.url : '';
 
   if (!url || url.startsWith('chrome://') || url.startsWith('edge://')) {
@@ -621,419 +638,12 @@ async function ensureContentScriptRegistered() {
       js: ['content.js'],
       matches: ['<all_urls>'],
       runAt: 'document_idle',
-      allFrames: false,
+      allFrames: true,
       persistAcrossSessions: true
     }]);
   } catch (e) {
     // Already registered or not supported; safe to ignore.
   }
-}
-
-/**
- * Cloud backup service (Google Drive + OneDrive)
- */
-const CloudBackup = {
-  providers: {
-    google: {
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-      folderName: 'AutoFill',
-      name: 'Google Drive'
-    },
-    onedrive: {
-      scope: 'offline_access Files.ReadWrite.AppFolder',
-      authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-      tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-      folderName: 'AutoFill',
-      name: 'OneDrive'
-    }
-  },
-
-  async getConfig() {
-    const result = await chrome.storage.local.get(CLOUD_CONFIG_KEY);
-    return result[CLOUD_CONFIG_KEY] || {};
-  },
-
-  async saveConfig(provider, config) {
-    const current = await this.getConfig();
-    current[provider] = { ...(current[provider] || {}), ...config };
-    await chrome.storage.local.set({ [CLOUD_CONFIG_KEY]: current });
-    return { success: true };
-  },
-
-  async getTokens() {
-    const result = await chrome.storage.local.get(CLOUD_TOKENS_KEY);
-    return result[CLOUD_TOKENS_KEY] || {};
-  },
-
-  async saveTokens(provider, tokenData) {
-    const tokens = await this.getTokens();
-    tokens[provider] = tokenData;
-    await chrome.storage.local.set({ [CLOUD_TOKENS_KEY]: tokens });
-  },
-
-  async uploadBackup(provider, csvContent) {
-    try {
-      const filename = buildBackupFilename();
-      const accessToken = await this.ensureToken(provider);
-      const fileInfo = await this.uploadByProvider(provider, accessToken, filename, csvContent);
-      return { success: true, provider, ...fileInfo };
-    } catch (error) {
-      console.error('Cloud backup failed:', error);
-      return { success: false, error: error.message || 'upload_failed', provider };
-    }
-  },
-
-  async listBackups(provider) {
-    try {
-      const accessToken = await this.ensureToken(provider);
-      const files = await this.listByProvider(provider, accessToken);
-      return { success: true, files };
-    } catch (error) {
-      console.error('List backups failed:', error);
-      return { success: false, error: error.message || 'list_failed' };
-    }
-  },
-
-  async downloadBackup(provider, fileId) {
-    try {
-      const accessToken = await this.ensureToken(provider);
-      const csv = await this.downloadByProvider(provider, accessToken, fileId);
-      return { success: true, csv };
-    } catch (error) {
-      console.error('Download backup failed:', error);
-      return { success: false, error: error.message || 'download_failed' };
-    }
-  },
-
-  async ensureToken(provider) {
-    const config = await this.getConfig();
-    const providerConfig = config[provider];
-    if (!providerConfig || !providerConfig.clientId) {
-      throw new Error('missing_client_id');
-    }
-
-    const tokens = await this.getTokens();
-    const existing = tokens[provider];
-    const now = Date.now();
-    if (existing && existing.accessToken && existing.expiresAt && existing.expiresAt - 60000 > now) {
-      return existing.accessToken;
-    }
-
-    if (existing && existing.refreshToken) {
-      try {
-        const refreshed = await this.refreshToken(provider, providerConfig, existing.refreshToken);
-        await this.saveTokens(provider, refreshed);
-        return refreshed.accessToken;
-      } catch (error) {
-        console.warn('Refresh token failed, falling back to auth flow:', error);
-      }
-    }
-
-    const fresh = await this.authorize(provider, providerConfig);
-    await this.saveTokens(provider, fresh);
-    return fresh.accessToken;
-  },
-
-  async authorize(provider, providerConfig) {
-    const meta = this.providers[provider];
-    if (!meta) throw new Error('unknown_provider');
-
-    const redirectUri = chrome.identity.getRedirectURL(`${provider}_callback`);
-    const state = `${provider}-${Math.random().toString(36).slice(2)}`;
-    const { verifier, challenge } = await createPkcePair();
-
-    const params = new URLSearchParams({
-      client_id: providerConfig.clientId,
-      response_type: 'code',
-      redirect_uri: redirectUri,
-      scope: meta.scope,
-      state,
-      code_challenge: challenge,
-      code_challenge_method: 'S256'
-    });
-
-    // Provider-specific additions
-    let authUrlBase = meta.authUrl;
-    let tokenUrlBase = meta.tokenUrl;
-
-    if (provider === 'google') {
-      params.set('access_type', 'offline');
-      params.set('prompt', 'consent');
-    } else if (provider === 'onedrive' && providerConfig.tenant) {
-      authUrlBase = `https://login.microsoftonline.com/${providerConfig.tenant}/oauth2/v2.0/authorize`;
-      tokenUrlBase = `https://login.microsoftonline.com/${providerConfig.tenant}/oauth2/v2.0/token`;
-    }
-
-    const authUrl = `${authUrlBase}?${params.toString()}`;
-    const redirect = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-    if (!redirect) throw new Error('auth_cancelled');
-    const redirectParams = new URL(redirect).searchParams;
-    const returnedState = redirectParams.get('state');
-    if (returnedState !== state) {
-      throw new Error('state_mismatch');
-    }
-    const code = redirectParams.get('code');
-    if (!code) throw new Error('missing_code');
-
-    const tokenBody = new URLSearchParams({
-      client_id: providerConfig.clientId,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier
-    });
-
-    const tokenResponse = await fetch(tokenUrlBase, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: tokenBody.toString()
-    });
-
-    if (!tokenResponse.ok) {
-      const errText = await tokenResponse.text();
-      throw new Error(`token_exchange_failed: ${errText}`);
-    }
-
-    const tokenJson = await tokenResponse.json();
-    return {
-      accessToken: tokenJson.access_token,
-      refreshToken: tokenJson.refresh_token,
-      expiresAt: Date.now() + ((tokenJson.expires_in || 3600) * 1000)
-    };
-  },
-
-  async refreshToken(provider, providerConfig, refreshToken) {
-    const meta = this.providers[provider];
-    let tokenUrlBase = meta.tokenUrl;
-    const body = new URLSearchParams({
-      client_id: providerConfig.clientId,
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    });
-
-    if (provider === 'onedrive' && providerConfig.tenant) {
-      tokenUrlBase = `https://login.microsoftonline.com/${providerConfig.tenant}/oauth2/v2.0/token`;
-    }
-
-    const res = await fetch(tokenUrlBase, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString()
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`refresh_failed: ${text}`);
-    }
-    const json = await res.json();
-    return {
-      accessToken: json.access_token,
-      refreshToken: json.refresh_token || refreshToken,
-      expiresAt: Date.now() + ((json.expires_in || 3600) * 1000)
-    };
-  },
-
-  async uploadByProvider(provider, accessToken, filename, csvContent) {
-    if (provider === 'google') {
-      const folderId = await this.ensureGoogleFolder(accessToken);
-
-      const metadata = {
-        name: filename,
-        parents: [folderId]
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([csvContent], { type: 'text/csv' }));
-
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: form
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`google_upload_failed: ${text}`);
-      }
-
-      const json = await res.json();
-      return { fileId: json.id, fileName: metadata.name };
-    }
-
-    if (provider === 'onedrive') {
-      await this.ensureOneDriveFolder(accessToken);
-      const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/special/approot:/AutoFill/${filename}:/content`;
-      const res = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'text/csv'
-        },
-        body: csvContent
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`onedrive_upload_failed: ${text}`);
-      }
-
-      const json = await res.json();
-      return { fileId: json.id, fileName: filename };
-    }
-
-    throw new Error('unknown_provider');
-  },
-
-  async listByProvider(provider, accessToken) {
-    if (provider === 'google') {
-      const folderId = await this.ensureGoogleFolder(accessToken);
-      const query = encodeURIComponent(`'${folderId}' in parents and mimeType='text/csv' and name contains 'AutoFill-' and trashed=false`);
-      const url = `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&pageSize=20&fields=files(id,name,modifiedTime,size)`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`google_list_failed: ${text}`);
-      }
-      const json = await res.json();
-      return json.files || [];
-    }
-
-    if (provider === 'onedrive') {
-      await this.ensureOneDriveFolder(accessToken);
-      const listUrl = 'https://graph.microsoft.com/v1.0/me/drive/special/approot:/AutoFill:/children?$orderby=lastModifiedDateTime desc&$top=20';
-      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`onedrive_list_failed: ${text}`);
-      }
-      const json = await res.json();
-      if (!json.value) return [];
-      return json.value.map(item => ({
-        id: item.id,
-        name: item.name,
-        modifiedTime: item.lastModifiedDateTime,
-        size: item.size
-      }));
-    }
-
-    throw new Error('unknown_provider');
-  },
-
-  async downloadByProvider(provider, accessToken, fileId) {
-    if (provider === 'google') {
-      const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`google_download_failed: ${text}`);
-      }
-      return await res.text();
-    }
-
-    if (provider === 'onedrive') {
-      const url = `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`onedrive_download_failed: ${text}`);
-      }
-      return await res.text();
-    }
-
-    throw new Error('unknown_provider');
-  },
-
-  async ensureGoogleFolder(accessToken) {
-    const name = this.providers.google.folderName;
-    const query = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name)`;
-    const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`google_folder_list_failed: ${text}`);
-    }
-    const json = await res.json();
-    if (json.files && json.files.length > 0) {
-      return json.files[0].id;
-    }
-
-    // Create folder
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name,
-        mimeType: 'application/vnd.google-apps.folder'
-      })
-    });
-
-    if (!createRes.ok) {
-      const text = await createRes.text();
-      throw new Error(`google_folder_create_failed: ${text}`);
-    }
-    const folder = await createRes.json();
-    return folder.id;
-  },
-
-  async ensureOneDriveFolder(accessToken) {
-    const name = this.providers.onedrive.folderName;
-    const listUrl = 'https://graph.microsoft.com/v1.0/me/drive/special/approot/children';
-    const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (res.ok) {
-      const json = await res.json();
-      const exists = (json.value || []).some(item => item.name === name && item.folder);
-      if (exists) return true;
-    }
-
-    const createUrl = 'https://graph.microsoft.com/v1.0/me/drive/special/approot/children';
-    const createRes = await fetch(createUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name,
-        folder: {},
-        '@microsoft.graph.conflictBehavior': 'rename'
-      })
-    });
-
-    if (!createRes.ok && createRes.status !== 409) {
-      const text = await createRes.text();
-      throw new Error(`onedrive_folder_create_failed: ${text}`);
-    }
-    return true;
-  }
-};
-
-function buildBackupFilename() {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join('');
-  return `AutoFill-${date}-${time}.csv`;
-}
-
-async function createPkcePair() {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const verifier = base64UrlEncode(array);
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  const challenge = base64UrlEncode(new Uint8Array(digest));
-  return { verifier, challenge };
-}
-
-function base64UrlEncode(buffer) {
-  let binary = '';
-  for (let i = 0; i < buffer.byteLength; i++) {
-    binary += String.fromCharCode(buffer[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // Override with fallback-aware handlers

@@ -44,9 +44,14 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  // Oppdater kun når URL endres eller siden er ferdig lastet
-  if (changeInfo.url || changeInfo.status === 'complete') {
-    await updateBadgeForTab(tabId, tab.url);
+  try {
+    // Oppdater kun når URL endres eller siden er ferdig lastet
+    if (changeInfo.url || changeInfo.status === 'complete') {
+      await updateBadgeForTab(tabId, tab.url);
+    }
+  } catch (e) {
+    // Ignore errors if tab was closed during update
+    console.debug('Error in onUpdated:', e);
   }
 });
 
@@ -374,38 +379,42 @@ async function updateBadgeWithCounts(tabId, fullMatches, partialMatches) {
  * @param {number} tabId - Tab ID
  */
 async function showAddFieldDialog(field, tabId) {
-  // Hent gjeldende URL
-  const tab = await chrome.tabs.get(tabId);
-  let hostname = new URL(tab.url).hostname;
+  try {
+    // Hent gjeldende URL
+    const tab = await chrome.tabs.get(tabId);
+    let hostname = new URL(tab.url).hostname;
 
-  // Bruk frame hostname hvis tilgjengelig (for iframes)
-  if (field.hostname) {
-    hostname = field.hostname;
+    // Bruk frame hostname hvis tilgjengelig (for iframes)
+    if (field.hostname) {
+      hostname = field.hostname;
+    }
+
+    // Opprett regel basert på feltinformasjon
+    const rule = {
+      sitePattern: hostname,
+      siteMatchType: 'host',
+      elementType: field.fieldType || 'text',
+      fieldType: field.type || 'name',
+      fieldPattern: field.identifier,
+      fieldUseRegex: false,
+      value: field.value
+    };
+
+    // Lagre regelen
+    const savedRule = await Storage.addRule(rule);
+
+    // Vis bekreftelse
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'AutoFill - Regel lagt til',
+      message: `Felt "${field.identifier}" på ${hostname} er lagt til`
+    });
+
+    console.log('Rule added:', savedRule);
+  } catch (error) {
+    console.warn('Could not add field (tab closed?):', error);
   }
-
-  // Opprett regel basert på feltinformasjon
-  const rule = {
-    sitePattern: hostname,
-    siteMatchType: 'host',
-    elementType: field.fieldType || 'text',
-    fieldType: field.type || 'name',
-    fieldPattern: field.identifier,
-    fieldUseRegex: false,
-    value: field.value
-  };
-
-  // Lagre regelen
-  const savedRule = await Storage.addRule(rule);
-
-  // Vis bekreftelse
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon48.png',
-    title: 'AutoFill - Regel lagt til',
-    message: `Felt "${field.identifier}" på ${hostname} er lagt til`
-  });
-
-  console.log('Rule added:', savedRule);
 }
 
 /**
@@ -414,40 +423,44 @@ async function showAddFieldDialog(field, tabId) {
  * @param {number} tabId - Tab ID
  */
 async function showAddMultipleFieldsDialog(fields, tabId) {
-  // Hent gjeldende URL
-  const tab = await chrome.tabs.get(tabId);
-  let hostname = new URL(tab.url).hostname;
+  try {
+    // Hent gjeldende URL
+    const tab = await chrome.tabs.get(tabId);
+    let hostname = new URL(tab.url).hostname;
 
-  // Bruk frame hostname hvis tilgjengelig (anta at alle felt er fra samme frame)
-  if (fields.length > 0 && fields[0].hostname) {
-    hostname = fields[0].hostname;
+    // Bruk frame hostname hvis tilgjengelig (anta at alle felt er fra samme frame)
+    if (fields.length > 0 && fields[0].hostname) {
+      hostname = fields[0].hostname;
+    }
+
+    // Opprett regler for alle feltene
+    const rules = fields.map(field => ({
+      sitePattern: hostname,
+      siteMatchType: 'host',
+      elementType: field.fieldType || 'text',
+      fieldType: field.type || 'name',
+      fieldPattern: field.identifier,
+      fieldUseRegex: false,
+      value: field.value
+    }));
+
+    // Lagre alle reglene
+    for (const rule of rules) {
+      await Storage.addRule(rule);
+    }
+
+    // Vis bekreftelse
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'AutoFill - Regler lagt til',
+      message: `${fields.length} felt på ${hostname} er lagt til`
+    });
+
+    console.log(`${fields.length} rules added`);
+  } catch (error) {
+    console.warn('Could not add fields (tab closed?):', error);
   }
-
-  // Opprett regler for alle feltene
-  const rules = fields.map(field => ({
-    sitePattern: hostname,
-    siteMatchType: 'host',
-    elementType: field.fieldType || 'text',
-    fieldType: field.type || 'name',
-    fieldPattern: field.identifier,
-    fieldUseRegex: false,
-    value: field.value
-  }));
-
-  // Lagre alle reglene
-  for (const rule of rules) {
-    await Storage.addRule(rule);
-  }
-
-  // Vis bekreftelse
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon48.png',
-    title: 'AutoFill - Regler lagt til',
-    message: `${fields.length} felt på ${hostname} er lagt til`
-  });
-
-  console.log(`${fields.length} rules added`);
 }
 
 /**

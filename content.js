@@ -668,11 +668,11 @@ function generateSelector(el) {
 function getFieldIdentifier(field) {
   const fieldType = getElementType(field);
 
-  // Prioriter: name > id > data-name > data-id > aria-label > placeholder
+  // Prioriter: name > data-name > data-id > id > aria-label > placeholder
   if (field.name) return { type: 'name', value: field.name, fieldType: fieldType };
-  if (field.id) return { type: 'id', value: field.id, fieldType: fieldType };
   if (field.getAttribute('data-name')) return { type: 'data-name', value: field.getAttribute('data-name'), fieldType: fieldType };
   if (field.getAttribute('data-id')) return { type: 'data-id', value: field.getAttribute('data-id'), fieldType: fieldType };
+  if (field.id) return { type: 'id', value: field.id, fieldType: fieldType };
   if (field.getAttribute('aria-label')) return { type: 'aria-label', value: field.getAttribute('aria-label'), fieldType: fieldType };
   if (field.placeholder) return { type: 'placeholder', value: field.placeholder, fieldType: fieldType };
 

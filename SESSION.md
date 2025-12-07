@@ -258,6 +258,13 @@ Blacklist/whitelist ble kun sjekket i content.js. Popup og badge viste fortsatt 
 ### Filer Oppdatert
 background.js; popup.js; ISSUES.md; SESSION.md
 
+### Tillegg: Smart domene-matching
+Forbedret `isUrlBlocked()` / `isBlockedSite()` med smart domene-matching:
+- `facebook.com` matcher nå automatisk `facebook.com` OG alle subdomener (`www.facebook.com`, `m.facebook.com`)
+- `*.facebook.com` matcher fortsatt kun subdomener
+- `regex:mønster` gir full regex-støtte
+- Wildcards (`*`, `?`) fungerer som før
+
 ### Neste Steg
-- Verifiser at blacklist fungerer korrekt for facebook.com og *.facebook.com
+- Verifiser at smart domene-matching fungerer korrekt
 - Test at badge viser tom for blokkerte sider

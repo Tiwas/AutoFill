@@ -212,7 +212,9 @@
 ## Notater
 
 - 07.12.2025: Versjon 0.9.0 - Stabilisering og feilrettinger:
+  - **Smart domene-matching:** `facebook.com` matcher nå automatisk hele domenet inkl. subdomener
   - **Blacklist/Whitelist:** Forbedret håndtering - sider sjekkes mot lister *før* scanning/regel-lasting
+  - **Støtte for regex:** Bruk `regex:mønster` i blacklist/whitelist for full regex-kontroll
   - **Feilrettinger:** "Permissions policy violation: unload" og "No tab with id" feil løst
   - **Ny safeBadgeUpdate():** Robust feilhåndtering for badge-operasjoner
   - **Fjernet deprecated 'unload' event:** Bruker nå kun 'pagehide' for cleanup

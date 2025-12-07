@@ -14,8 +14,9 @@
 ## 🆕 What's New in v0.9.0
 
 ### 🛡️ Improved Blacklist/Whitelist Handling
-*   **Smarter Blocking:** Sites are now checked against blacklist/whitelist *before* any scanning or rule loading occurs.
-*   **No More Wasted Resources:** Blocked sites skip all processing, improving performance.
+*   **Smart Domain Matching:** Just type `facebook.com` to block the entire domain including all subdomains (www, m, etc.)
+*   **Multiple Pattern Types:** Use simple domains, wildcards (`*.example.com`), or regex (`regex:pattern`)
+*   **Smarter Blocking:** Sites are checked against blacklist/whitelist *before* any scanning occurs.
 *   **Field-Level Blacklist:** Exclude specific fields by ID pattern (supports wildcards and regex).
 
 ### 🐛 Bug Fixes & Stability

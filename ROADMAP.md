@@ -211,6 +211,11 @@
 
 ## Notater
 
+- 07.12.2025: Versjon 0.9.0 - Stabilisering og feilrettinger:
+  - **Blacklist/Whitelist:** Forbedret håndtering - sider sjekkes mot lister *før* scanning/regel-lasting
+  - **Feilrettinger:** "Permissions policy violation: unload" og "No tab with id" feil løst
+  - **Ny safeBadgeUpdate():** Robust feilhåndtering for badge-operasjoner
+  - **Fjernet deprecated 'unload' event:** Bruker nå kun 'pagehide' for cleanup
 - 07.12.2025: Teknisk gjeld og kodekvalitet - FULLFØRT. Se ISSUES.md for detaljer:
   - **Fase 1 (Sikkerhet):** CSP i manifest, MutationObserver cleanup, verifisert JSON.parse/innerHTML
   - **Fase 2 (Ytelse):** Regex-cache, debouncing, TreeWalker DOM-traversering, forbedret feilhåndtering

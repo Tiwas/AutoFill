@@ -398,19 +398,49 @@ const Storage = {
     return [headers, ...rows].join('\n');
   },
 
+  // CSV validation constants
+  CSV_MAX_SIZE_BYTES: 10 * 1024 * 1024, // 10MB max
+  CSV_MAX_RULES: 10000, // Max rules per import
+  VALID_MATCH_TYPES: ['host', 'domain', 'url', 'regex'],
+  VALID_FIELD_TYPES: ['name', 'id', 'data-name', 'data-id', 'placeholder', 'selector'],
+  VALID_ELEMENT_TYPES: ['text', 'select', 'checkbox', 'radio', 'textarea', 'date', 'email', 'password', 'number', 'tel', 'url', 'macro'],
+  VALID_CONDITION_TYPES: ['none', 'urlContains', 'urlRegex', 'selectorExists'],
+
   /**
-   * Importerer regler fra CSV-format
+   * Importerer regler fra CSV-format med utvidet validering
    * @param {string} csvContent - CSV-innhold
    * @param {boolean} merge - Om regler skal merges eller overskrive
-   * @returns {Promise<Object>} Resultat med success og antall
+   * @returns {Promise<Object>} Resultat med success, antall, og eventuelle valideringsfeil
    */
   async importFromCSV(csvContent, merge = true) {
+    const validationErrors = [];
+    const skippedRows = [];
+
     try {
+      // Pre-validation: Sjekk filstørrelse
+      const contentSize = new Blob([csvContent]).size;
+      if (contentSize > this.CSV_MAX_SIZE_BYTES) {
+        throw new Error(`CSV-fil for stor: ${Math.round(contentSize / 1024 / 1024)}MB (maks ${this.CSV_MAX_SIZE_BYTES / 1024 / 1024}MB)`);
+      }
+
+      if (!csvContent || typeof csvContent !== 'string' || csvContent.trim().length === 0) {
+        throw new Error('Tom eller ugyldig CSV-innhold');
+      }
+
       const lines = csvContent.trim().split('\n');
+
+      if (lines.length < 2) {
+        throw new Error('CSV må inneholde header og minst én rad med data');
+      }
+
+      if (lines.length - 1 > this.CSV_MAX_RULES) {
+        throw new Error(`For mange regler: ${lines.length - 1} (maks ${this.CSV_MAX_RULES})`);
+      }
+
       const headers = lines[0].split(';');
 
       if (!this.validateCSVHeaders(headers)) {
-        throw new Error('Ugyldig CSV-format: Feil kolonner');
+        throw new Error('Ugyldig CSV-format: Manglende påkrevde kolonner');
       }
 
       const headerIndex = {};
@@ -418,14 +448,64 @@ const Storage = {
 
       const newRules = [];
       for (let i = 1; i < lines.length; i++) {
+        const lineNum = i + 1;
         const values = this.parseCSVLine(lines[i]);
 
+        // Skip empty lines
+        if (values.length === 1 && values[0].trim() === '') {
+          continue;
+        }
+
         if (values.length !== headers.length) {
-          console.warn(`Row ${i + 1} has incorrect column count, skipping`);
+          skippedRows.push({ line: lineNum, reason: `Feil antall kolonner (${values.length} vs ${headers.length})` });
           continue;
         }
 
         const get = (name) => headerIndex[name] !== undefined ? values[headerIndex[name]] : undefined;
+
+        // Valider påkrevde felt
+        const sitePattern = get('sitePattern');
+        const fieldPattern = get('fieldPattern');
+
+        if (!sitePattern || sitePattern.trim() === '') {
+          skippedRows.push({ line: lineNum, reason: 'Mangler sitePattern' });
+          continue;
+        }
+
+        if (!fieldPattern || fieldPattern.trim() === '') {
+          skippedRows.push({ line: lineNum, reason: 'Mangler fieldPattern' });
+          continue;
+        }
+
+        // Valider enum-felt
+        const siteMatchType = get('siteMatchType');
+        if (siteMatchType && !this.VALID_MATCH_TYPES.includes(siteMatchType)) {
+          validationErrors.push({ line: lineNum, field: 'siteMatchType', value: siteMatchType, reason: 'Ugyldig verdi' });
+        }
+
+        const fieldType = get('fieldType');
+        if (fieldType && !this.VALID_FIELD_TYPES.includes(fieldType)) {
+          validationErrors.push({ line: lineNum, field: 'fieldType', value: fieldType, reason: 'Ugyldig verdi' });
+        }
+
+        const elementType = get('elementType') || 'text';
+        if (!this.VALID_ELEMENT_TYPES.includes(elementType)) {
+          validationErrors.push({ line: lineNum, field: 'elementType', value: elementType, reason: 'Ugyldig verdi' });
+        }
+
+        const conditionType = get('conditionType') || 'none';
+        if (!this.VALID_CONDITION_TYPES.includes(conditionType)) {
+          validationErrors.push({ line: lineNum, field: 'conditionType', value: conditionType, reason: 'Ugyldig verdi' });
+        }
+
+        // Valider regex hvis brukt
+        if (get('fieldUseRegex') === 'true') {
+          try {
+            new RegExp(fieldPattern);
+          } catch (e) {
+            validationErrors.push({ line: lineNum, field: 'fieldPattern', value: fieldPattern, reason: 'Ugyldig regex: ' + e.message });
+          }
+        }
 
         const lastRaw = get('lastUsed');
         const lastUsedVal = (lastRaw !== undefined && lastRaw !== null && `${lastRaw}`.trim() !== '')
@@ -434,23 +514,27 @@ const Storage = {
 
         const rule = {
           id: get('id') || this.generateId(),
-          sitePattern: get('sitePattern'),
-          siteMatchType: get('siteMatchType'),
-          elementType: get('elementType') || 'text',
-          fieldType: get('fieldType'),
-          fieldPattern: get('fieldPattern'),
+          sitePattern: sitePattern,
+          siteMatchType: siteMatchType || 'host',
+          elementType: elementType,
+          fieldType: fieldType || 'name',
+          fieldPattern: fieldPattern,
           fieldUseRegex: get('fieldUseRegex') === 'true',
           value: this.unescapeCSV(get('value') || ''),
-          enabled: get('enabled') === 'true',
+          enabled: get('enabled') !== 'false', // Default true
           created: parseInt(get('created')) || Date.now(),
           lastUsed: Number.isFinite(lastUsedVal) ? lastUsedVal : null,
           sortOrder: get('sortOrder') !== undefined ? parseInt(get('sortOrder')) : null,
           priority: get('priority') !== undefined ? parseInt(get('priority')) : 0,
-          conditionType: get('conditionType') || 'none',
+          conditionType: conditionType,
           conditionValue: this.unescapeCSV(get('conditionValue') || '')
         };
 
         newRules.push(rule);
+      }
+
+      if (newRules.length === 0) {
+        throw new Error('Ingen gyldige regler funnet i CSV');
       }
 
       if (merge) {
@@ -464,13 +548,20 @@ const Storage = {
       return {
         success: true,
         imported: newRules.length,
-        total: newRules.length
+        total: newRules.length,
+        skipped: skippedRows.length,
+        skippedRows: skippedRows.length > 0 ? skippedRows : undefined,
+        warnings: validationErrors.length,
+        validationErrors: validationErrors.length > 0 ? validationErrors : undefined
       };
     } catch (error) {
       console.error('Error importing CSV:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        skipped: skippedRows.length,
+        skippedRows: skippedRows.length > 0 ? skippedRows : undefined,
+        validationErrors: validationErrors.length > 0 ? validationErrors : undefined
       };
     }
   },

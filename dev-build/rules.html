@@ -237,7 +237,10 @@
             <select id="fieldType">
               <option value="name">Name attribute</option>
               <option value="id">ID attribute</option>
+              <option value="data-name">Data-Name attribute</option>
+              <option value="data-id">Data-ID attribute</option>
               <option value="placeholder">Placeholder</option>
+              <option value="aria-label">Aria-Label</option>
               <option value="selector">CSS selector (avansert)</option>
             </select>
             <small id="fieldTypeHint">How the field is identified</small>
@@ -268,6 +271,12 @@
             <label for="priority" id="lblPriority">Priority</label>
             <input type="number" id="priority" value="0" min="-100" max="100" />
             <small>Higher number wins when multiple rules match</small>
+          </div>
+
+          <div class="form-group">
+            <label for="ruleDelay">Delay (ms)</label>
+            <input type="number" id="ruleDelay" value="0" min="0" placeholder="0" />
+            <small>Wait time before execution (after visibility)</small>
           </div>
 
           <div class="form-group">

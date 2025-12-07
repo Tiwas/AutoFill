@@ -126,12 +126,15 @@
 - [ ] Kryptering av sensitive verdier (ikke prioritert)
 - [ ] Passord-beskyttelse av regler (ikke prioritert)
 - [x] Whitelist/blacklist for nettsted
+- [x] Content Security Policy (CSP) i manifest
+- [x] Konsekvent feilhåndtering (ErrorHandler)
+- [x] Input-validering (Validator)
 - [-] Automatisk sletting av gamle regler
 - [-] Audit log for regelbruk
 
 ### Milestone: Sikker datahåndtering
 
-## Versjon 0.9.0 - Profiler og Testing (Pågår)
+## Versjon 0.9.0 - Profiler og Testing ✅ FULLFØRT
 
 ### Features
 - [x] Profil-støtte (Jobb, Privat etc.)
@@ -139,9 +142,9 @@
 - [x] Enhetstester for alle moduler
 - [x] Integrasjonstester
 - [x] End-to-end tester
-- [x] Performance-optimalisering
-- [x] Minnelekkasje-testing
-- [x] Browser-kompatibilitet (Firefox, Edge)
+- [x] Performance-optimalisering (regex-cache, TreeWalker, debouncing)
+- [x] Minnelekkasje-fikset (MutationObserver cleanup ved unload)
+- [-] Browser-kompatibilitet (Firefox, Edge) - utsatt til egen porting-økt
 
 ### Milestone: Fleksibilitet og Kvalitet
 
@@ -208,6 +211,14 @@
 
 ## Notater
 
+- 07.12.2025: Teknisk gjeld og kodekvalitet - FULLFØRT. Se ISSUES.md for detaljer:
+  - **Fase 1 (Sikkerhet):** CSP i manifest, MutationObserver cleanup, verifisert JSON.parse/innerHTML
+  - **Fase 2 (Ytelse):** Regex-cache, debouncing, TreeWalker DOM-traversering, forbedret feilhåndtering
+  - **Fase 3 (Kodekvalitet):** Ny utils.js med Logger, Validator, ErrorHandler
+  - **Fase 4 (Kompatibilitet):** Fjernet duplikat content script-registrering
+  - **Fase 5 (Manglende funksjoner):** Skybackup-validering med checksum
+  - **Fase 6 (Edge cases):** Iframe-håndtering, select multi-select, CSV-import validering
+  - **Fase 7 (Beste praksis):** ReDoS-deteksjon, ARIA-tilgjengelighet, loggingsrammeverk
 - 03.12.2025: Fikset fallback-injeksjon av content script for kontekstmenyen for å løse "Receiving end does not exist"-feil.
 - Prioriteringer kan endres basert på tilbakemeldinger
 - Hver versjon skal testes grundig før neste påbegynnes

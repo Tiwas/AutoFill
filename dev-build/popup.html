@@ -21,6 +21,9 @@
         <button id="openFullViewBtn" class="btn btn-secondary" title="Open full view of rules">
           <span id="btnOpenFullViewLabel">Open full view</span>
         </button>
+        <button id="recordMacroBtn" class="btn btn-secondary" style="background-color: #fee2e2; color: #991b1b;" title="Record a new macro">
+            <span>● Record</span>
+        </button>
         <button id="exportBtn" class="btn btn-secondary" title="Export rules to CSV">
           <span id="btnExportLabel">Export</span>
         </button>
@@ -217,17 +220,18 @@
     </div>
 
     <!-- Tilgjengelige felter på siden -->
-    <div class="available-fields">
-      <div class="available-header">
-        <div>
-          <h3 id="availableTitle">Available fields</h3>
-          <small id="availableSubtitle">Based on fields on the active tab</small>
-        </div>
-        <label for="availableSearch" id="availableSearchLabel" style="display:none;">Available fields</label>
-        <input type="text" id="availableSearch" placeholder="Search fields..." />
+    <div class="accordion available-fields-accordion">
+      <div class="accordion-header" id="availableHeader">
+        <h3>Available fields <span id="availableCount">(0)</span></h3>
+        <span class="arrow">▼</span>
       </div>
-      <div id="availableFieldsList" class="available-list">
-        <p class="empty" id="availableEmpty">No fields found. Open a page with a form.</p>
+      <div class="accordion-content" id="availableContent" style="display: none;">
+        <div class="available-toolbar">
+            <input type="text" id="availableSearch" placeholder="Search fields..." />
+        </div>
+        <div id="availableFieldsList" class="available-list">
+            <p class="empty" id="availableEmpty">No fields found. Open a page with a form.</p>
+        </div>
       </div>
     </div>
 
@@ -322,7 +326,10 @@
             <select id="fieldType">
               <option value="name">Name-attributt</option>
               <option value="id">ID-attributt</option>
+              <option value="data-name">Data-Name attributt</option>
+              <option value="data-id">Data-ID attributt</option>
               <option value="placeholder">Placeholder</option>
+              <option value="aria-label">Aria-Label</option>
               <option value="selector">CSS selector (avansert)</option>
             </select>
             <small id="fieldTypeHint">Hvordan feltet identifiseres</small>
@@ -351,6 +358,13 @@
             <label for="priority" id="lblPriority">Prioritet</label>
             <input type="number" id="priority" value="0" min="-100" max="100" />
             <small id="priorityHint">Høyere tall vinner når flere regler matcher</small>
+          </div>
+
+          <!-- Delay -->
+          <div class="form-group">
+            <label for="ruleDelay">Delay (ms)</label>
+            <input type="number" id="ruleDelay" value="0" min="0" placeholder="0" />
+            <small>Ventetid før makro starter (etter synlighet)</small>
           </div>
 
           <!-- Condition -->

@@ -272,6 +272,7 @@ get contenteditable() { return chrome.i18n.getMessage("elementTypes_contentedita
 fieldTypes: { get name() { return chrome.i18n.getMessage("fieldTypes_name"); },
 get id() { return chrome.i18n.getMessage("fieldTypes_id"); },
 get placeholder() { return chrome.i18n.getMessage("fieldTypes_placeholder"); },
+get 'aria-label'() { return "Aria-Label"; },
 get selector() { return chrome.i18n.getMessage("fieldTypes_selector"); } },
 matchTypes: { get host() { return chrome.i18n.getMessage("matchTypes_host"); },
 get domain() { return chrome.i18n.getMessage("matchTypes_domain"); },

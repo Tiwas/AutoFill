@@ -14,7 +14,7 @@
         <h1 id="appTitle">AutoFill</h1>
         <div class="profile-selector-container">
             <select id="profileSelect" class="profile-select"></select>
-            <button id="manageProfilesBtn" class="btn-icon-small" title="Manage profiles">⚙️</button>
+            <button id="manageProfilesBtn" class="btn-icon-small" title="Manage profiles" aria-label="Manage profiles">⚙️</button>
         </div>
       </div>
       <div class="actions">
@@ -221,11 +221,11 @@
 
     <!-- Tilgjengelige felter på siden -->
     <div class="accordion available-fields-accordion">
-      <div class="accordion-header" id="availableHeader">
+      <div class="accordion-header" id="availableHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="availableContent">
         <h3>Available fields <span id="availableCount">(0)</span></h3>
-        <span class="arrow">▼</span>
+        <span class="arrow" aria-hidden="true">▼</span>
       </div>
-      <div class="accordion-content" id="availableContent" style="display: none;">
+      <div class="accordion-content" id="availableContent" style="display: none;" role="region" aria-labelledby="availableHeader">
         <div class="available-toolbar">
             <input type="text" id="availableSearch" placeholder="Search fields..." />
         </div>
@@ -239,7 +239,7 @@
     <div class="optimizer-section" id="optimizerSection" style="display: none;">
       <div class="optimizer-header">
         <h3 id="optimizerTitle">Optimization suggestions</h3>
-        <button id="closeOptimizer" class="btn-icon">&times;</button>
+        <button id="closeOptimizer" class="btn-icon" aria-label="Close optimizer">&times;</button>
       </div>
       <div id="optimizerStats" class="optimizer-stats"></div>
       <div id="suggestionsList" class="suggestions-list">
@@ -266,18 +266,18 @@
     </div>
 
     <!-- Loading -->
-    <div id="loading" class="loading" style="display: none;">
-      <div class="spinner"></div>
+    <div id="loading" class="loading" style="display: none;" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
       <p id="loadingText">Loading...</p>
     </div>
   </div>
 
   <!-- Modal for redigering -->
-  <div id="editModal" class="modal" style="display: none;">
+  <div id="editModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle"></h2>
-        <button class="modal-close" id="closeModal">&times;</button>
+        <button class="modal-close" id="closeModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <form id="editForm">
@@ -398,11 +398,11 @@
   </div>
 
   <!-- AI assist modal -->
-  <div id="aiModal" class="modal" style="display: none;">
+  <div id="aiModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="aiModalTitle"></h2>
-        <button class="modal-close" id="closeAiModal">&times;</button>
+        <button class="modal-close" id="closeAiModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="aiModalIntro"></p>
@@ -420,11 +420,11 @@
   </div>
 
   <!-- Variables Modal -->
-  <div id="variablesModal" class="modal" style="display: none;">
+  <div id="variablesModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="variablesModalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="variablesModalTitle"></h2>
-        <button class="modal-close" id="closeVariablesModal">&times;</button>
+        <button class="modal-close" id="closeVariablesModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p>Definer variabler som kan brukes i feltverdier som <code>{variabelNavn}</code>.</p>
@@ -443,11 +443,11 @@
   </div>
 
   <!-- Profiles Modal -->
-  <div id="profilesModal" class="modal" style="display: none;">
+  <div id="profilesModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="profilesModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Administrer Profiler</h2>
-        <button class="modal-close" id="closeProfilesModal">&times;</button>
+        <h2 id="profilesModalTitle">Administrer Profiler</h2>
+        <button class="modal-close" id="closeProfilesModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <div class="variables-list" id="profilesList">
@@ -463,11 +463,11 @@
   </div>
 
   <!-- Move Rules Modal -->
-  <div id="moveRulesModal" class="modal" style="display: none;">
+  <div id="moveRulesModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="moveRulesModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Flytt regler</h2>
-        <button class="modal-close" id="closeMoveModal">&times;</button>
+        <h2 id="moveRulesModalTitle">Flytt regler</h2>
+        <button class="modal-close" id="closeMoveModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p>Velg profil å flytte valgte regler til:</p>
@@ -485,11 +485,11 @@
     </div>
   </div>
 
-  <div id="cloudRestoreModal" class="modal" style="display: none;">
+  <div id="cloudRestoreModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloudRestoreTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="cloudRestoreTitle"></h2>
-        <button class="modal-close" id="closeCloudRestoreModal">&times;</button>
+        <button class="modal-close" id="closeCloudRestoreModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="cloudRestoreSubtitle"></p>
@@ -502,11 +502,11 @@
     </div>
   </div>
 
-  <div id="importPreviewModal" class="modal" style="display: none;">
+  <div id="importPreviewModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="importPreviewTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="importPreviewTitle">Import og validering</h2>
-        <button class="modal-close" id="closeImportPreview">&times;</button>
+        <button class="modal-close" id="closeImportPreview" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="importPreviewSummary"></p>

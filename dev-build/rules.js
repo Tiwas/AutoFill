@@ -286,19 +286,17 @@ function handleSelectAll(e) {
 }
 
 function toggleSelectMode() {
-  selectMode = !selectMode;
-  selectedRules.clear();
-  if (elements.selectModeBtn && TRANSLATIONS.current) {
-    elements.selectModeBtn.textContent = selectMode
-      ? (TRANSLATIONS.current.buttons?.cancel || 'Avbryt')
-      : (TRANSLATIONS.current.buttons?.selectModeBtn || 'Velg flere');
-  }
-  if (elements.selectionBar) {
-    elements.selectionBar.style.display = selectMode ? 'flex' : 'none';
+  if (selectedRules.size > 0) {
+    // If items selected, clear them (this effectively exits select mode via updateSelectionUi)
+    selectedRules.clear();
+  } else {
+    // If nothing selected, user wants to enter mode manually?
+    // Or maybe "Select All"? Let's just toggle the boolean for manual entry if needed,
+    // but mostly this button acts as "Cancel" now when active.
+    selectMode = !selectMode;
   }
   updateSelectionUi();
   renderRules();
-  updateStats();
 }
 
 async function loadRules() {
@@ -403,8 +401,27 @@ function updateSelectionUi() {
     const allVisibleSelected = filteredRules.length > 0 && filteredRules.every(r => selectedRules.has(r.id));
     elements.selectAllCheckbox.checked = allVisibleSelected;
   }
+  
+  // Auto-toggle select mode based on selection
+  const hasSelection = selectedRules.size > 0;
+  selectMode = hasSelection; // Sync state variable
+  
+  // Toggle bars
   if (elements.selectionBar) {
-    elements.selectionBar.style.display = selectMode ? 'flex' : 'none';
+    elements.selectionBar.style.display = hasSelection ? 'flex' : 'none';
+  }
+  if (elements.floatingActions) {
+      elements.floatingActions.style.display = hasSelection ? 'none' : 'flex';
+  }
+  
+  // Update Select All text if needed (e.g. "Cancel" vs "Select All")
+  if (elements.selectModeBtn) {
+      // We can reuse this button as a manual toggle if user wants to enter mode without selecting
+      // or just hide it if auto-detect is preferred. Let's keep it as "Select Multiple" for now
+      // but maybe change text to "Cancel Selection" if active.
+      elements.selectModeBtn.textContent = hasSelection ? 
+        (TRANSLATIONS.current?.buttons?.cancel || 'Cancel') : 
+        (TRANSLATIONS.current?.buttons?.selectModeBtn || 'Select Multiple');
   }
 }
 
@@ -517,22 +534,68 @@ function renderRules() {
     const hasSearch = !!(elements.searchInput.value.trim());
     Object.keys(bySite).sort().forEach(site => {
       const section = document.createElement('div');
-      const shouldExpand = hasSearch; // åpne paneler når det er søk/filtrering aktivt
+      
+      // Default collapsed, unless explicitly opened or search is active
+      const storageKey = `group_open_${site}`;
+      const isStoredOpen = sessionStorage.getItem(storageKey) === 'true';
+      const shouldExpand = hasSearch || isStoredOpen;
+      
       section.className = `rule-group ${shouldExpand ? '' : 'collapsed'}`.trim();
 
       const header = document.createElement('div');
       header.className = 'rule-group-header';
+      
+      // Group Checkbox
+      const groupCheckbox = document.createElement('input');
+      groupCheckbox.type = 'checkbox';
+      groupCheckbox.className = 'checkbox group-checkbox';
+      // Check if all visible rules in this group are selected
+      const groupRuleIds = bySite[site].map(r => r.id);
+      const allSelected = groupRuleIds.every(id => selectedRules.has(id));
+      groupCheckbox.checked = allSelected;
+      
+      groupCheckbox.addEventListener('click', (e) => {
+          e.stopPropagation(); // Don't toggle collapse
+          const checked = e.target.checked;
+          groupRuleIds.forEach(id => {
+              if (checked) selectedRules.add(id);
+              else selectedRules.delete(id);
+          });
+          updateSelectionUi();
+          renderRules(); // Re-render to update individual checkboxes
+      });
+
       const title = document.createElement('h3');
       title.textContent = site;
+      
       const toggle = document.createElement('span');
       toggle.className = 'rule-group-toggle';
       toggle.textContent = shouldExpand ? '−' : '+';
-      header.appendChild(title);
-      header.appendChild(toggle);
-      header.addEventListener('click', () => {
-        const isCollapsed = section.classList.contains('collapsed');
-        section.classList.toggle('collapsed', !isCollapsed);
-        toggle.textContent = isCollapsed ? '−' : '+';
+      
+      // Container for title/toggle to separate from checkbox
+      const titleContainer = document.createElement('div');
+      titleContainer.style.display = 'flex';
+      titleContainer.style.alignItems = 'center';
+      titleContainer.style.gap = '10px';
+      titleContainer.style.flex = '1';
+      
+      titleContainer.appendChild(title);
+      titleContainer.appendChild(toggle);
+
+      header.appendChild(groupCheckbox);
+      header.appendChild(titleContainer);
+      
+      header.addEventListener('click', (e) => {
+        if (e.target === groupCheckbox) return; 
+        
+        const wasCollapsed = section.classList.contains('collapsed');
+        const newCollapsed = !wasCollapsed; // Toggle logic
+        
+        section.classList.toggle('collapsed', newCollapsed);
+        toggle.textContent = newCollapsed ? '+' : '−';
+        
+        // Lagre at den er ÅPEN (hvis den ikke er collapsed)
+        sessionStorage.setItem(storageKey, !newCollapsed);
       });
 
       const list = document.createElement('div');
@@ -1009,6 +1072,7 @@ function openEditModal(ruleId) {
     const commentEl = document.getElementById('comment');
     if (commentEl) commentEl.value = rule.comment || '';
     document.getElementById('priority').value = rule.priority || 0;
+    document.getElementById('ruleDelay').value = rule.delay || 0;
     document.getElementById('conditionType').value = rule.conditionType || 'none';
     document.getElementById('conditionValue').value = rule.conditionValue || '';
     document.getElementById('enabled').checked = rule.enabled;
@@ -1048,6 +1112,7 @@ async function handleSaveRule(e) {
     value: document.getElementById('value').value,
     comment: document.getElementById('comment')?.value || '',
     priority: parseInt(document.getElementById('priority').value) || 0,
+    delay: parseInt(document.getElementById('ruleDelay').value) || 0,
     conditionType: document.getElementById('conditionType').value,
     conditionValue: document.getElementById('conditionValue').value.trim(),
     enabled: document.getElementById('enabled').checked,

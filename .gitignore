@@ -15,3 +15,6 @@ node_modules/
 cloud.js
 config/
 build.cmd
+
+# Local analysis files
+ISSUES.md

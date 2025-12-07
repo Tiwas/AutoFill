@@ -88,7 +88,7 @@
     <div class="optimizer-section" id="optimizerSection" style="display: none;">
       <div class="optimizer-header">
         <h3 id="optimizerTitle">Optimization suggestions</h3>
-        <button id="closeOptimizer" class="btn-icon">&times;</button>
+        <button id="closeOptimizer" class="btn-icon" aria-label="Close optimizer">&times;</button>
       </div>
       <div id="optimizerStats" class="optimizer-stats"></div>
       <div id="suggestionsList" class="suggestions-list">
@@ -191,11 +191,11 @@
   </div>
 
   <!-- Modal for redigering -->
-  <div id="editModal" class="modal" style="display: none;">
+  <div id="editModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle">Edit rule</h2>
-        <button class="modal-close" id="closeModal">&times;</button>
+        <button class="modal-close" id="closeModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <form id="editForm">
@@ -306,11 +306,11 @@
     </div>
   </div>
 
-  <div id="aiModal" class="modal" style="display: none;">
+  <div id="aiModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="aiModalTitle">AI field detection</h2>
-        <button class="modal-close" id="closeAiModal">&times;</button>
+        <button class="modal-close" id="closeAiModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="aiModalIntro">Copy the prompt below and use it in any LLM to get autofill rules.</p>
@@ -335,11 +335,11 @@
     </div>
   </div>
 
-  <div id="variablesModal" class="modal" style="display: none;">
+  <div id="variablesModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="variablesModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Variables</h2>
-        <button class="modal-close" id="closeVariablesModal">&times;</button>
+        <h2 id="variablesModalTitle">Variables</h2>
+        <button class="modal-close" id="closeVariablesModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="variablesModalDesc">Define variables you can use in field values like <code>{variableName}</code>.</p>
@@ -356,11 +356,11 @@
       </div>
     </div>
   </div>
-  <div id="cloudSettingsModal" class="modal" style="display: none;">
+  <div id="cloudSettingsModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloudSettingsModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Cloud Backup Settings</h2>
-        <button class="modal-close" id="closeCloudSettingsModal">&times;</button>
+        <h2 id="cloudSettingsModalTitle">Cloud Backup Settings</h2>
+        <button class="modal-close" id="closeCloudSettingsModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p>Configure your cloud providers to enable backup and sync.</p>
@@ -384,14 +384,14 @@
     </div>
   </div>
 
-  <div id="cloudRestoreModal" class="modal" style="display: none;">
+  <div id="cloudRestoreModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloudRestoreModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Restore from Cloud</h2>
-        <button class="modal-close" id="closeCloudRestoreModal">&times;</button>
+        <h2 id="cloudRestoreModalTitle">Restore from Cloud</h2>
+        <button class="modal-close" id="closeCloudRestoreModal" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
-        <div id="cloudRestoreLoading" style="display:none;">Loading backups...</div>
+        <div id="cloudRestoreLoading" style="display:none;" role="status" aria-live="polite">Loading backups...</div>
         <div id="cloudRestoreList" class="backup-list"></div>
         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
             <button id="localRestoreBtn" class="btn btn-secondary">Or upload local CSV file</button>
@@ -400,11 +400,11 @@
     </div>
   </div>
 
-  <div id="importPreviewModal" class="modal" style="display: none;">
+  <div id="importPreviewModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="importPreviewTitle">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="importPreviewTitle">Import & validation</h2>
-        <button class="modal-close" id="closeImportPreview">&times;</button>
+        <button class="modal-close" id="closeImportPreview" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="importPreviewSummary"></p>

@@ -12,6 +12,7 @@ if (window.__autofillContentLoaded) {
 // Globale variabler
 let lastClickedElement = null;
 let autoFillRules = [];
+let executedMacros = new Set(); // Ny: Hindre loop ved makro-avspilling
 let debugMode = false;
 let autofillEnabled = true;
 let autofillDelayMs = 0;
@@ -70,6 +71,239 @@ let currentProfileId = 'default';
   // Fang høyreklikk slik at context menu-lagring alltid har et felt
   document.addEventListener('contextmenu', handleMouseDown, true);
 })();
+
+// --- MACRO RECORDER & PLAYER START ---
+
+const MacroRecorder = {
+  isRecording: false,
+  startTime: 0,
+  steps: [],
+  overlay: null,
+  lastEventTime: 0,
+
+  start: function() {
+    if (this.isRecording) return;
+    this.isRecording = true;
+    this.startTime = Date.now();
+    this.lastEventTime = this.startTime;
+    this.steps = [];
+    this.createOverlay();
+    
+    // Attach listeners
+    document.addEventListener('click', this.handleClick, true);
+    document.addEventListener('change', this.handleChange, true);
+    document.addEventListener('keydown', this.handleKeydown, true);
+    
+    debugLog('Macro recording started');
+  },
+
+  stop: function() {
+    if (!this.isRecording) return;
+    this.isRecording = false;
+    this.removeOverlay();
+    
+    // Remove listeners
+    document.removeEventListener('click', this.handleClick, true);
+    document.removeEventListener('change', this.handleChange, true);
+    document.removeEventListener('keydown', this.handleKeydown, true);
+    
+    debugLog('Macro recording stopped', this.steps);
+    return this.steps;
+  },
+
+  recordStep: function(type, target, value = null, extra = {}) {
+    const now = Date.now();
+    const delay = now - this.lastEventTime;
+    this.lastEventTime = now;
+
+    const selector = generateSelector(target);
+    if (!selector && target !== document.body) {
+        console.warn('Could not generate selector for', target);
+        return;
+    }
+
+    const step = {
+      type: type,
+      selector: selector,
+      delay: delay, // Delay før denne handlingen utføres
+      ...extra
+    };
+    
+    if (value !== null) step.value = value;
+
+    this.steps.push(step);
+    this.updateOverlayCount();
+  },
+
+  handleClick: function(e) {
+    // Ikke ta opp klikk på vår egen overlay
+    if (MacroRecorder.overlay && MacroRecorder.overlay.contains(e.target)) return;
+    
+    // Unngå doble klikk-registreringer (debounce)
+    const lastStep = this.steps[this.steps.length - 1];
+    const now = Date.now();
+    if (lastStep && lastStep.type === 'click' && (now - this.lastEventTime < 500)) {
+        // Sjekk om det er samme element (via selector)
+        const currentSelector = generateSelector(e.target);
+        if (lastStep.selector === currentSelector) {
+            debugLog('Ignorerer dobbeltklikk i opptak');
+            return;
+        }
+    }
+
+    MacroRecorder.recordStep('click', e.target);
+  },
+
+  handleChange: function(e) {
+    // Registrer endringer i input felt
+    const val = getFieldValue(e.target);
+    MacroRecorder.recordStep('type', e.target, val);
+  },
+
+  handleKeydown: function(e) {
+    // Vi bryr oss primært om navigasjonstaster som Enter, Tab, piler
+    const importantKeys = ['Enter', 'Tab', 'ArrowDown', 'ArrowUp', 'Escape'];
+    if (importantKeys.includes(e.key)) {
+       MacroRecorder.recordStep('key', e.target, null, { key: e.key, code: e.code });
+    }
+  },
+  
+  createOverlay: function() {
+    const div = document.createElement('div');
+    div.id = 'autofill-recorder-overlay';
+    div.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 999999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: default;
+    `;
+    div.innerHTML = `
+      <span>🔴 Recording... <span id="af-rec-count">(0)</span></span>
+      <button id="af-rec-stop" style="
+        background: white; 
+        color: #ef4444; 
+        border: none; 
+        padding: 4px 8px; 
+        border-radius: 4px; 
+        cursor: pointer;
+        font-weight: bold;
+      ">Stop & Save</button>
+    `;
+    document.body.appendChild(div);
+    this.overlay = div;
+
+    document.getElementById('af-rec-stop').addEventListener('click', () => {
+        const macro = this.stop();
+        // Send macro til background for lagring
+        const host = window.location.hostname;
+        chrome.runtime.sendMessage({
+            action: 'addRule',
+            rule: {
+                sitePattern: host,
+                siteMatchType: 'host',
+                fieldType: 'macro', // Ny type
+                fieldPattern: 'Macro: ' + new Date().toLocaleString(),
+                value: JSON.stringify(macro), // Lagre stegene som JSON-streng
+                priority: 100
+            }
+        }, () => {
+            alert('Macro saved! Reload page to test.');
+        });
+    });
+  },
+  
+  updateOverlayCount: function() {
+    const el = document.getElementById('af-rec-count');
+    if (el) el.textContent = `(${this.steps.length})`;
+  },
+
+  removeOverlay: function() {
+    if (this.overlay) {
+        this.overlay.remove();
+        this.overlay = null;
+    }
+  },
+  
+  // Sørg for at context (this) er riktig i event handlers
+  bind: function() {
+      this.handleClick = this.handleClick.bind(this);
+      this.handleChange = this.handleChange.bind(this);
+      this.handleKeydown = this.handleKeydown.bind(this);
+  }
+};
+MacroRecorder.bind();
+
+
+const MacroPlayer = {
+  play: async function(macroJson) {
+    let steps;
+    try {
+        steps = typeof macroJson === 'string' ? JSON.parse(macroJson) : macroJson;
+    } catch (e) {
+        console.error('Invalid macro JSON', e);
+        return;
+    }
+    
+    if (!Array.isArray(steps)) return;
+
+    console.log('[AutoFill Macro] Starting playback with', steps.length, 'steps'); // Forced log
+
+    for (const step of steps) {
+        // Vent angitt delay (eller default 300ms for stabilitet)
+        const delay = Math.max(step.delay || 300, 100); 
+        await new Promise(r => setTimeout(r, delay));
+        
+        const el = document.querySelector(step.selector);
+        if (!el) {
+            debugLog('Macro element not found:', step.selector, 'Skipping step');
+            continue;
+        }
+        
+        debugLog('Executing step:', step.type, step.selector);
+        
+        try {
+            // Sørg for at elementet er synlig og klart
+            el.scrollIntoView({ block: 'center', inline: 'center' });
+            
+            if (step.type === 'click') {
+                // Simuler full klikk-sekvens
+                el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                el.click(); 
+            } else if (step.type === 'type') {
+                el.focus();
+                setNativeValue(el, processValue(step.value)); // Støtt variabler i makroer også!
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                // Blur er ofte lurt etter typing
+                // el.blur(); 
+            } else if (step.type === 'key') {
+                el.dispatchEvent(new KeyboardEvent('keydown', { key: step.key, code: step.code, bubbles: true }));
+                el.dispatchEvent(new KeyboardEvent('keyup', { key: step.key, code: step.code, bubbles: true }));
+                // Spesialhåndtering: Hvis det er Enter på en form, kan det hende vi skal submitte?
+                // Nei, la siden håndtere det.
+            }
+        } catch (err) {
+            console.error('Error executing macro step', step, err);
+        }
+    }
+    debugLog('Macro playback finished');
+  }
+};
+
+// --- MACRO RECORDER & PLAYER END ---
 
 /**
  * Last inn innstillinger
@@ -198,6 +432,26 @@ function isEditableElement(element) {
 }
 
 /**
+ * Hent effektiv URL/hostname (håndterer about:blank/srcdoc ved å sjekke parent)
+ */
+function getEffectiveLocation() {
+  let href = window.location.href;
+  let hostname = window.location.hostname;
+
+  if (href === 'about:blank' || href === 'about:srcdoc' || !hostname) {
+    try {
+      if (window.parent !== window) {
+        href = window.parent.location.href;
+        hostname = window.parent.location.hostname;
+      }
+    } catch (e) {
+      // Cross-origin blokkering, vi må bruke det vi har
+    }
+  }
+  return { href, hostname };
+}
+
+/**
  * Hent regler for gjeldende side
  */
 async function loadRulesForCurrentSite(profileId = null) {
@@ -207,9 +461,11 @@ async function loadRulesForCurrentSite(profileId = null) {
       showScanToast('scanning');
     }
 
+    const loc = getEffectiveLocation();
+
     const response = await chrome.runtime.sendMessage({
       action: 'getRulesForSite',
-      url: window.location.href,
+      url: loc.href,
       profileId: profileId
     });
 
@@ -274,6 +530,49 @@ function performAutoFill(force = false) {
   }
 
   debugLog(`Starter autofill med ${autoFillRules.length} regler`);
+
+  // 1. Sjekk for makroer først
+  for (const rule of autoFillRules) {
+      if (rule.fieldType === 'macro') {
+          if (!force && executedMacros.has(rule.id)) {
+              continue;
+          }
+
+          if (matchesCondition(rule, window.location.href, document.body)) {
+              // Sjekk om makroens start-element er synlig
+              let steps;
+              try {
+                  steps = typeof rule.value === 'string' ? JSON.parse(rule.value) : rule.value;
+              } catch(e) { continue; }
+
+              if (steps && steps.length > 0) {
+                  const firstSelector = steps[0].selector;
+                  const el = document.querySelector(firstSelector);
+                  
+                  // Er elementet synlig? (offsetParent er null hvis hidden)
+                  if (el && el.offsetParent !== null) {
+                      console.log('[AutoFill] Macro start element found & visible, running:', firstSelector);
+                      executedMacros.add(rule.id);
+                      
+                      const delay = parseInt(rule.delay) || 0;
+                      if (delay > 0) {
+                          console.log(`[AutoFill] Waiting ${delay}ms before executing macro...`);
+                          setTimeout(() => {
+                              MacroPlayer.play(steps);
+                              markRuleAsUsed(rule.id);
+                          }, delay);
+                      } else {
+                          MacroPlayer.play(steps);
+                          markRuleAsUsed(rule.id);
+                      }
+                  } else {
+                      // Debug log kun hvis vi er i debug mode for å unngå spam
+                      debugLog('[AutoFill] Macro start element not visible yet:', firstSelector);
+                  }
+              }
+          }
+      }
+  }
 
   let filledCount = 0;
   const filledFields = [];
@@ -576,52 +875,68 @@ function showScanToast(stage, rulesCount = 0, fullMatches = 0, partialMatches = 
 }
 
 /**
- * Finn alle redigerbare felt på siden
+ * Finn alle redigerbare felt på siden (inkludert Shadow DOM)
  */
-function findAllEditableFields() {
+function findAllEditableFields(root = document) {
   const fields = [];
 
-  // Input-felt (text, email, password, date, etc.)
-  const textInputs = document.querySelectorAll(
-    'input[type="text"], ' +
-    'input[type="email"], ' +
-    'input[type="password"], ' +
-    'input[type="search"], ' +
-    'input[type="tel"], ' +
-    'input[type="url"], ' +
-    'input[type="number"], ' +
-    'input[type="date"], ' +
-    'input[type="datetime-local"], ' +
-    'input[type="time"], ' +
-    'input[type="week"], ' +
-    'input[type="month"], ' +
-    'input[type="color"], ' +
-    'input[type="range"], ' +
-    'input:not([type])'
+  // Finn felter i gjeldende rot
+  const inputs = root.querySelectorAll(
+    'input, select, textarea, [contenteditable="true"]'
   );
-  fields.push(...Array.from(textInputs));
+  
+  // Filtrer for sikkerhets skyld (querySelectorAll tar med alle input-typer)
+  for (const input of inputs) {
+    if (isEditableElement(input)) {
+        fields.push(input);
+    }
+  }
 
-  // Checkbox-felt
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  fields.push(...Array.from(checkboxes));
-
-  // Radio button-felt
-  const radios = document.querySelectorAll('input[type="radio"]');
-  fields.push(...Array.from(radios));
-
-  // Select-felt (dropdown)
-  const selects = document.querySelectorAll('select');
-  fields.push(...Array.from(selects));
-
-  // Textareas
-  const textareas = document.querySelectorAll('textarea');
-  fields.push(...Array.from(textareas));
-
-  // ContentEditable elementer
-  const contentEditables = document.querySelectorAll('[contenteditable="true"]');
-  fields.push(...Array.from(contentEditables));
+  // Traverser Shadow DOM
+  // querySelectorAll('*') kan være tungt på store sider, men nødvendig for å finne shadow roots
+  // uten å vite hvor de er. En optimalisering kunne være å kun lete i kjente containere.
+  const allElements = root.querySelectorAll('*');
+  for (const el of allElements) {
+    if (el.shadowRoot) {
+      fields.push(...findAllEditableFields(el.shadowRoot));
+    }
+  }
 
   return fields;
+}
+
+/**
+ * Generer en unik CSS-selector for et element
+ */
+function generateSelector(el) {
+  if (!el || el.nodeType !== 1) return '';
+  
+  const path = [];
+  while (el && el.nodeType === 1) {
+    let selector = el.tagName.toLowerCase();
+    
+    if (el.id) {
+      selector = '#' + el.id;
+      path.unshift(selector);
+      break; // ID er unikt nok, vi trenger ikke gå lenger opp
+    }
+    
+    // Hvis elementet har søsken av samme type, legg til nth-of-type
+    let sibling = el;
+    let count = 1;
+    while (sibling = sibling.previousElementSibling) {
+      if (sibling.tagName.toLowerCase() === selector) count++;
+    }
+    
+    if (count > 1) {
+      selector += ':nth-of-type(' + count + ')';
+    }
+    
+    path.unshift(selector);
+    el = el.parentElement;
+  }
+  
+  return path.join(' > ');
 }
 
 /**
@@ -630,10 +945,17 @@ function findAllEditableFields() {
 function getFieldIdentifier(field) {
   const fieldType = getElementType(field);
 
-  // Prioriter: name > id > placeholder
+  // Prioriter: name > data-name > data-id > id > aria-label > placeholder
   if (field.name) return { type: 'name', value: field.name, fieldType: fieldType };
+  if (field.getAttribute('data-name')) return { type: 'data-name', value: field.getAttribute('data-name'), fieldType: fieldType };
+  if (field.getAttribute('data-id')) return { type: 'data-id', value: field.getAttribute('data-id'), fieldType: fieldType };
   if (field.id) return { type: 'id', value: field.id, fieldType: fieldType };
+  if (field.getAttribute('aria-label')) return { type: 'aria-label', value: field.getAttribute('aria-label'), fieldType: fieldType };
   if (field.placeholder) return { type: 'placeholder', value: field.placeholder, fieldType: fieldType };
+
+  // Fallback: Generer selector hvis ingen andre attributter finnes
+  const selector = generateSelector(field);
+  if (selector) return { type: 'selector', value: selector, fieldType: fieldType };
 
   return null;
 }
@@ -672,6 +994,7 @@ function findMatchingRule(field, identifier) {
       continue;
     }
 
+    // Sjekk selector-regler
     if (rule.fieldType === 'selector') {
       try {
         if (field.matches && field.matches(rule.fieldPattern)) {
@@ -683,11 +1006,16 @@ function findMatchingRule(field, identifier) {
       continue;
     }
 
-    if (!identifier) continue;
+    // Sjekk attributt-baserte regler direkte på feltet
+    let fieldValue = null;
+    if (rule.fieldType === 'name') fieldValue = field.name;
+    else if (rule.fieldType === 'id') fieldValue = field.id;
+    else if (rule.fieldType === 'data-name') fieldValue = field.getAttribute('data-name');
+    else if (rule.fieldType === 'data-id') fieldValue = field.getAttribute('data-id');
+    else if (rule.fieldType === 'placeholder') fieldValue = field.placeholder;
+    else if (rule.fieldType === 'aria-label') fieldValue = field.getAttribute('aria-label');
 
-    if (rule.fieldType !== identifier.type) continue;
-
-    if (matchPattern(identifier.value, rule.fieldPattern, rule.fieldUseRegex)) {
+    if (fieldValue && matchPattern(fieldValue, rule.fieldPattern, rule.fieldUseRegex)) {
       best = pickBetterRule(best, rule);
     }
   }
@@ -794,6 +1122,23 @@ function matchWildcard(text, pattern) {
 }
 
 /**
+ * Hjelpefunksjon for å sette verdi på React/Vue-inputs slik at state oppdateres
+ */
+function setNativeValue(element, value) {
+  const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
+  const prototype = Object.getPrototypeOf(element);
+  const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+  if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+    prototypeValueSetter.call(element, value);
+  } else if (valueSetter) {
+    valueSetter.call(element, value);
+  } else {
+    element.value = value;
+  }
+}
+
+/**
  * Fyll ut et felt basert på type
  */
 function fillField(field, value) {
@@ -801,17 +1146,21 @@ function fillField(field, value) {
   const inputType = field.type ? field.type.toLowerCase() : '';
 
   try {
+    // Simuler et museklikk først for å "vekke" komponenten (hjelper med floating labels)
+    field.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    field.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    field.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+    // Gi feltet fokus
+    field.focus();
+
     if (tagName === 'select') {
-      // Select/dropdown - velg option med matchende verdi
       fillSelectField(field, value);
     } else if (inputType === 'checkbox') {
-      // Checkbox - sett checked basert på verdi
       fillCheckboxField(field, value);
     } else if (inputType === 'radio') {
-      // Radio button - sett checked
       fillRadioField(field, value);
     } else if (inputType === 'range') {
-      // Range - sett value (med numerisk validering)
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
         field.value = numValue;
@@ -819,19 +1168,50 @@ function fillField(field, value) {
         field.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else if (field.isContentEditable) {
-      // ContentEditable - sett textContent
       field.textContent = value;
       field.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
-      // Standard input, textarea, date, time, color, etc. - sett value
-      // Støtter: text, email, password, search, tel, url, number,
-      //          date, datetime-local, time, week, month, color
-      field.value = value;
+      // Standard input handling (Text, Email, osv.)
+      
+      // 1. Sett verdien på "native" måte for å trigge React/Frameworks
+      setNativeValue(field, value);
+      
+      // 2. Send standard events
       field.dispatchEvent(new Event('input', { bubbles: true }));
       field.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // 3. Spesialhåndtering for "smarte" søkefelter (comboboxes)
+      const isCombobox = field.getAttribute('role') === 'combobox' || 
+                         field.getAttribute('aria-autocomplete') === 'list' ||
+                         field.getAttribute('aria-haspopup') === 'listbox';
+                         
+      if (isCombobox) {
+        // Vent litt så søket rekker å kjøre, så velg første resultat
+        setTimeout(() => {
+            field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+            field.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+            
+            setTimeout(() => {
+                field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+                field.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+                // Blur etter valg
+                field.blur(); 
+            }, 100);
+        }, 500);
+        return; // Avslutt her, blur skjer i timeouten
+      }
     }
+
+    // Fjern fokus (blur) til slutt for å trigge validering
+    field.blur();
+
   } catch (error) {
     console.error('Error filling field:', error);
+    // Fallback til standard metode hvis noe feiler
+    try {
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) {}
   }
 }
 
@@ -1093,6 +1473,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: true });
       });
       return true;
+  } else if (request.action === 'startRecording') {
+      MacroRecorder.start();
+      sendResponse({ success: true });
+      return true;
+  } else if (request.action === 'stopRecording') {
+      const steps = MacroRecorder.stop();
+      sendResponse({ success: true, steps: steps });
+      return true;
   }
   return false;
 });
@@ -1149,12 +1537,16 @@ function handleGetFieldInfo(sendResponse) {
     return;
   }
 
+  const loc = getEffectiveLocation();
+
   const field = {
     type: identifier.type,
     identifier: identifier.value,
     value: getFieldValue(lastClickedElement),
     fieldType: identifier.fieldType,
-    tagName: lastClickedElement.tagName.toLowerCase()
+    tagName: lastClickedElement.tagName.toLowerCase(),
+    hostname: loc.hostname,
+    url: loc.href
   };
 
   sendResponse({ success: true, field });
@@ -1207,7 +1599,9 @@ function handleGetAllFilledFields(sendResponse) {
       identifier: identifier.value,
       value: value,
       fieldType: identifier.fieldType,
-      tagName: field.tagName.toLowerCase()
+      tagName: field.tagName.toLowerCase(),
+      hostname: getEffectiveLocation().hostname,
+      url: getEffectiveLocation().href
     });
   }
 

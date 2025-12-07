@@ -1310,36 +1310,68 @@ async function loadRules() {
 
 /**
  * Sjekk om en URL er blokkert av blacklist/whitelist
+ *
+ * Støtter følgende mønstre:
+ * - "facebook.com" → matcher facebook.com OG *.facebook.com (smart domene-matching)
+ * - "*.facebook.com" → matcher kun subdomener (www.facebook.com, m.facebook.com)
+ * - "regex:pattern" → matcher med regex
+ * - "example.com/path*" → matcher URL med wildcard
  */
 async function isUrlBlocked(url) {
   try {
     const hostname = new URL(url).hostname;
     const { blacklist = [], whitelist = [] } = await chrome.storage.local.get(['blacklist', 'whitelist']);
 
-    // Wildcard matching funksjon
-    const matchesPattern = (patterns, value) => {
+    // Matching funksjon som støtter wildcards, regex og smart domene-matching
+    const matchesPattern = (patterns, hostname, fullUrl) => {
       return patterns.some(pattern => {
-        if (value === pattern) return true;
-        // Konverter wildcard til regex
-        const regexPattern = '^' + pattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-          .replace(/\*/g, '.*')
-          .replace(/\?/g, '.') + '$';
-        try {
-          return new RegExp(regexPattern, 'i').test(value);
-        } catch (e) {
-          return false;
+        pattern = pattern.trim();
+        if (!pattern) return false;
+
+        // Regex-mønster (prefiks "regex:")
+        if (pattern.startsWith('regex:')) {
+          try {
+            const regex = new RegExp(pattern.slice(6), 'i');
+            return regex.test(hostname) || regex.test(fullUrl);
+          } catch (e) {
+            return false;
+          }
         }
+
+        // Eksakt match
+        if (hostname === pattern || fullUrl === pattern) return true;
+
+        // Wildcard-mønster (inneholder * eller ?)
+        if (pattern.includes('*') || pattern.includes('?')) {
+          const regexPattern = '^' + pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')
+            .replace(/\?/g, '.') + '$';
+          try {
+            const regex = new RegExp(regexPattern, 'i');
+            return regex.test(hostname) || regex.test(fullUrl);
+          } catch (e) {
+            return false;
+          }
+        }
+
+        // Smart domene-matching: "facebook.com" matcher også "*.facebook.com"
+        // Sjekk om hostname er eksakt match ELLER slutter med .pattern
+        if (hostname === pattern || hostname.endsWith('.' + pattern)) {
+          return true;
+        }
+
+        return false;
       });
     };
 
-    // Whitelist har prioritet
-    if (whitelist.length > 0 && !matchesPattern(whitelist, hostname) && !matchesPattern(whitelist, url)) {
+    // Whitelist har prioritet - hvis whitelist er satt og URL ikke matcher, blokker
+    if (whitelist.length > 0 && !matchesPattern(whitelist, hostname, url)) {
       return true;
     }
 
     // Sjekk blacklist
-    if (blacklist.length > 0 && (matchesPattern(blacklist, hostname) || matchesPattern(blacklist, url))) {
+    if (blacklist.length > 0 && matchesPattern(blacklist, hostname, url)) {
       return true;
     }
 

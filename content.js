@@ -417,17 +417,51 @@ function debugLog(...args) {
 
 /**
  * Sjekk blacklist/whitelist for gjeldende site
+ *
+ * Støtter følgende mønstre:
+ * - "facebook.com" → matcher facebook.com OG *.facebook.com (smart domene-matching)
+ * - "*.facebook.com" → matcher kun subdomener (www.facebook.com, m.facebook.com)
+ * - "regex:pattern" → matcher med regex
+ * - "example.com/path*" → matcher URL med wildcard
  */
 function isBlockedSite(hostname, url) {
-  const matchesPattern = (patterns, value) => {
-    return patterns.some(p => matchPattern(value, p, false));
+  const matchesAnyPattern = (patterns, hostname, fullUrl) => {
+    return patterns.some(pattern => {
+      pattern = pattern.trim();
+      if (!pattern) return false;
+
+      // Regex-mønster (prefiks "regex:")
+      if (pattern.startsWith('regex:')) {
+        try {
+          const regex = new RegExp(pattern.slice(6), 'i');
+          return regex.test(hostname) || regex.test(fullUrl);
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // Eksakt match
+      if (hostname === pattern || fullUrl === pattern) return true;
+
+      // Wildcard-mønster (inneholder * eller ?)
+      if (pattern.includes('*') || pattern.includes('?')) {
+        return matchPattern(hostname, pattern, false) || matchPattern(fullUrl, pattern, false);
+      }
+
+      // Smart domene-matching: "facebook.com" matcher også "*.facebook.com"
+      if (hostname === pattern || hostname.endsWith('.' + pattern)) {
+        return true;
+      }
+
+      return false;
+    });
   };
 
-  if (whitelist.length > 0 && !matchesPattern(whitelist, hostname) && !matchesPattern(whitelist, url)) {
+  if (whitelist.length > 0 && !matchesAnyPattern(whitelist, hostname, url)) {
     return true; // whitelist aktiv, men ingen treff
   }
 
-  if (blacklist.length > 0 && (matchesPattern(blacklist, hostname) || matchesPattern(blacklist, url))) {
+  if (blacklist.length > 0 && matchesAnyPattern(blacklist, hostname, url)) {
     return true;
   }
 

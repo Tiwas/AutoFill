@@ -1308,9 +1308,57 @@ async function loadRules() {
   }
 }
 
+/**
+ * Sjekk om en URL er blokkert av blacklist/whitelist
+ */
+async function isUrlBlocked(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    const { blacklist = [], whitelist = [] } = await chrome.storage.local.get(['blacklist', 'whitelist']);
+
+    // Wildcard matching funksjon
+    const matchesPattern = (patterns, value) => {
+      return patterns.some(pattern => {
+        if (value === pattern) return true;
+        // Konverter wildcard til regex
+        const regexPattern = '^' + pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.') + '$';
+        try {
+          return new RegExp(regexPattern, 'i').test(value);
+        } catch (e) {
+          return false;
+        }
+      });
+    };
+
+    // Whitelist har prioritet
+    if (whitelist.length > 0 && !matchesPattern(whitelist, hostname) && !matchesPattern(whitelist, url)) {
+      return true;
+    }
+
+    // Sjekk blacklist
+    if (blacklist.length > 0 && (matchesPattern(blacklist, hostname) || matchesPattern(blacklist, url))) {
+      return true;
+    }
+
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function loadPageRules() {
   if (!currentTab || !currentTab.url) {
     pageRules = [];
+    return;
+  }
+
+  // Sjekk blacklist/whitelist - ikke vis regler for blokkerte sider
+  if (await isUrlBlocked(currentTab.url)) {
+    pageRules = [];
+    console.log('Site is blacklisted, not loading rules');
     return;
   }
 

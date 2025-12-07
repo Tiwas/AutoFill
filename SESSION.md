@@ -232,3 +232,32 @@ content.js; background.js; popup.js; ISSUES.md; SESSION.md
 ### Neste Steg
 - Verifiser at feilmeldingene er borte etter reload av utvidelsen.
 - Test badge-oppdatering på tvers av tabs og vinduer.
+
+## Sesjon 13 - 2025-12-07
+
+### Mål
+Fikse at blacklist ikke ble respektert av popup og badge.
+
+### Problem
+Blacklist/whitelist ble kun sjekket i content.js. Popup og badge viste fortsatt matcher for blokkerte sider (f.eks. facebook.com).
+
+### Gjennomført
+1. **background.js - Ny `isUrlBlocked()` funksjon**
+   - Sjekker URL mot blacklist/whitelist med wildcard-støtte
+   - Konverterer wildcards (`*`, `?`) til regex
+   - Case-insensitive matching
+   - `updateBadgeForTab()` returnerer tidlig for blokkerte sider
+
+2. **popup.js - Samme `isUrlBlocked()` funksjon**
+   - `loadPageRules()` sjekker nå blacklist før den henter regler
+   - Blokkerte sider viser ingen regler i popup
+
+3. **Dokumentasjon**
+   - Oppdatert ISSUES.md med detaljer om løsningen
+
+### Filer Oppdatert
+background.js; popup.js; ISSUES.md; SESSION.md
+
+### Neste Steg
+- Verifiser at blacklist fungerer korrekt for facebook.com og *.facebook.com
+- Test at badge viser tom for blokkerte sider

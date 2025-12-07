@@ -207,6 +207,47 @@ async function safeBadgeUpdate(tabId, { text, color, title }) {
   }
 }
 
+/**
+ * Sjekk om en URL er blokkert av blacklist/whitelist
+ */
+async function isUrlBlocked(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    const { blacklist = [], whitelist = [] } = await chrome.storage.local.get(['blacklist', 'whitelist']);
+
+    // Wildcard matching funksjon
+    const matchesPattern = (patterns, value) => {
+      return patterns.some(pattern => {
+        if (value === pattern) return true;
+        // Konverter wildcard til regex
+        const regexPattern = '^' + pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.') + '$';
+        try {
+          return new RegExp(regexPattern, 'i').test(value);
+        } catch (e) {
+          return false;
+        }
+      });
+    };
+
+    // Whitelist har prioritet - hvis whitelist er satt og URL ikke matcher, blokker
+    if (whitelist.length > 0 && !matchesPattern(whitelist, hostname) && !matchesPattern(whitelist, url)) {
+      return true;
+    }
+
+    // Sjekk blacklist
+    if (blacklist.length > 0 && (matchesPattern(blacklist, hostname) || matchesPattern(blacklist, url))) {
+      return true;
+    }
+
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function updateBadgeForTab(tabId, url) {
   try {
     // Valider tabId først
@@ -232,6 +273,12 @@ async function updateBadgeForTab(tabId, url) {
     // Ignorer chrome:// og chrome-extension:// sider
     if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
       await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin' });
+      return;
+    }
+
+    // Sjekk blacklist/whitelist
+    if (await isUrlBlocked(url)) {
+      await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin - Blokkert' });
       return;
     }
 

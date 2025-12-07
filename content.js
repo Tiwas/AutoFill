@@ -27,49 +27,121 @@ let userVariables = {};
 let currentLanguage = 'en';
 let currentProfileId = 'default';
 
+// Observer references for cleanup (prevents memory leaks)
+let domObserver = null;
+let modalObserver = null;
+
+// Regex compilation cache (prevents re-creating regex objects on every match)
+const regexCache = new Map();
+const REGEX_CACHE_MAX_SIZE = 100;
+
+/**
+ * Debounce utility - delays function execution until after wait ms have elapsed
+ * since the last time it was invoked
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Milliseconds to wait
+ * @returns {Function} - Debounced function
+ */
+function debounce(func, wait) {
+  let timeout = null;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+// Debounced version of triggerAutoFill for high-frequency events
+const debouncedTriggerAutoFill = debounce(() => triggerAutoFill(), 150);
+
+/**
+ * Get or create a cached regex object
+ * @param {string} pattern - The regex pattern
+ * @param {string} flags - Regex flags (default 'i' for case-insensitive)
+ * @returns {RegExp|null} - Compiled regex or null if invalid
+ */
+function getCachedRegex(pattern, flags = 'i') {
+  const cacheKey = `${pattern}::${flags}`;
+
+  if (regexCache.has(cacheKey)) {
+    return regexCache.get(cacheKey);
+  }
+
+  try {
+    const regex = new RegExp(pattern, flags);
+
+    // Evict oldest entries if cache is full
+    if (regexCache.size >= REGEX_CACHE_MAX_SIZE) {
+      const firstKey = regexCache.keys().next().value;
+      regexCache.delete(firstKey);
+    }
+
+    regexCache.set(cacheKey, regex);
+    return regex;
+  } catch (error) {
+    console.error('Invalid regex pattern:', pattern, error);
+    regexCache.set(cacheKey, null); // Cache the failure too
+    return null;
+  }
+}
+
 /**
  * Initialiser content script
+ * Wrapped i try-catch for robust feilhåndtering
  */
 (async function init() {
-  debugLog('AutoFill Plugin content script lastet');
+  try {
+    debugLog('AutoFill Plugin content script lastet');
 
-  // Last inn innstillinger
-  await loadSettings();
-  await loadCurrentProfile();
+    // Last inn innstillinger (med fallback ved feil)
+    await loadSettings().catch(err => {
+      console.warn('[AutoFill] Failed to load settings, using defaults:', err);
+    });
 
-  // Hent regler for denne siden
-  await loadRulesForCurrentSite(currentProfileId);
+    await loadCurrentProfile().catch(err => {
+      console.warn('[AutoFill] Failed to load profile, using default:', err);
+    });
 
-  // Sjekk blacklist/whitelist
-  if (isBlockedSite(window.location.hostname, window.location.href)) {
-    debugLog('Site blokkert av blacklist/whitelist, stopper');
-    return;
-  }
+    const loc = getEffectiveLocation();
 
-  // Lytt til focus-events for å spore siste klikket element
-  document.addEventListener('mousedown', handleMouseDown, true);
+    // Sjekk blacklist/whitelist før vi gjør noe som helst (inkludert scanning)
+    if (isBlockedSite(loc.hostname, loc.href)) {
+      debugLog('Site blokkert av blacklist/whitelist, stopper init');
+      return;
+    }
 
-  // Kjor autofill når siden er ferdig lastet (hvis aktivert)
-  if (autofillEnabled) {
-    if (autofillTrigger === 'interaction') {
-      attachInteractionTrigger();
-    } else {
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', triggerAutoFill);
+    // Hent regler for denne siden
+    await loadRulesForCurrentSite(currentProfileId).catch(err => {
+      console.warn('[AutoFill] Failed to load rules:', err);
+    });
+
+    // Lytt til focus-events for å spore siste klikket element
+    document.addEventListener('mousedown', handleMouseDown, true);
+
+    // Kjor autofill når siden er ferdig lastet (hvis aktivert)
+    if (autofillEnabled) {
+      if (autofillTrigger === 'interaction') {
+        attachInteractionTrigger();
       } else {
-        triggerAutoFill();
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', triggerAutoFill);
+        } else {
+          triggerAutoFill();
+        }
       }
     }
+
+    // Observer DOM-endringer for dynamiske sider (SPA)
+    observeDOMChanges();
+
+    // Observer modals som åpnes
+    observeModalChanges();
+
+    // Fang høyreklikk slik at context menu-lagring alltid har et felt
+    document.addEventListener('contextmenu', handleMouseDown, true);
+
+  } catch (error) {
+    console.error('[AutoFill] Critical initialization error:', error);
   }
-
-  // Observer DOM-endringer for dynamiske sider (SPA)
-  observeDOMChanges();
-
-  // Observer modals som åpnes
-  observeModalChanges();
-
-  // Fang høyreklikk slik at context menu-lagring alltid har et felt
-  document.addEventListener('contextmenu', handleMouseDown, true);
 })();
 
 // --- MACRO RECORDER & PLAYER START ---
@@ -169,7 +241,9 @@ const MacroRecorder = {
   },
   
   createOverlay: function() {
+    if (!document.body) return; // Cannot create overlay without body
     const div = document.createElement('div');
+    if (!div.style) return; // Safety check
     div.id = 'autofill-recorder-overlay';
     div.style.cssText = `
       position: fixed;
@@ -433,22 +507,53 @@ function isEditableElement(element) {
 
 /**
  * Hent effektiv URL/hostname (håndterer about:blank/srcdoc ved å sjekke parent)
+ * Traverserer oppover i iframe-hierarkiet til vi finner en gyldig URL
+ * Maks 10 nivåer for å unngå uendelig løkke
  */
 function getEffectiveLocation() {
   let href = window.location.href;
   let hostname = window.location.hostname;
+  let currentWindow = window;
+  let depth = 0;
+  const maxDepth = 10;
 
-  if (href === 'about:blank' || href === 'about:srcdoc' || !hostname) {
+  // Traverser oppover til vi finner en gyldig URL
+  while ((href === 'about:blank' || href === 'about:srcdoc' || !hostname) && depth < maxDepth) {
     try {
-      if (window.parent !== window) {
-        href = window.parent.location.href;
-        hostname = window.parent.location.hostname;
+      if (currentWindow.parent && currentWindow.parent !== currentWindow) {
+        currentWindow = currentWindow.parent;
+        // Prøv å lese location - dette kan kaste SecurityError ved cross-origin
+        href = currentWindow.location.href;
+        hostname = currentWindow.location.hostname;
+        depth++;
+      } else {
+        // Nådd toppen av hierarkiet
+        break;
       }
     } catch (e) {
-      // Cross-origin blokkering, vi må bruke det vi har
+      // Cross-origin blokkering - prøv å bruke document.referrer som fallback
+      if (document.referrer) {
+        try {
+          const referrerUrl = new URL(document.referrer);
+          href = document.referrer;
+          hostname = referrerUrl.hostname;
+          debugLog('Using document.referrer as fallback:', href);
+        } catch (urlError) {
+          // Ugyldig referrer URL
+          debugLog('Could not parse referrer:', document.referrer);
+        }
+      }
+      break;
     }
   }
-  return { href, hostname };
+
+  // Siste fallback - bruk top.location via postMessage eller aksepter tom
+  if (!hostname) {
+    debugLog('Warning: Could not determine effective hostname, using empty');
+    hostname = '';
+  }
+
+  return { href, hostname, iframeDepth: depth };
 }
 
 /**
@@ -456,12 +561,20 @@ function getEffectiveLocation() {
  */
 async function loadRulesForCurrentSite(profileId = null) {
   try {
+    const loc = getEffectiveLocation();
+
+    // Ikke scan hvis siden er blokkert
+    if (isBlockedSite(loc.hostname, loc.href)) {
+      debugLog('Site blokkert - hopper over regel-skann');
+      const existing = document.getElementById('autofill-scan-toast');
+      if (existing) existing.remove();
+      return;
+    }
+
     // Vis scan-toast: Stadium 1 - Scanning
     if (scanToastEnabled) {
       showScanToast('scanning');
     }
-
-    const loc = getEffectiveLocation();
 
     const response = await chrome.runtime.sendMessage({
       action: 'getRulesForSite',
@@ -521,6 +634,12 @@ async function loadRulesForCurrentSite(profileId = null) {
 function performAutoFill(force = false) {
   if (!autofillEnabled && !force) {
     debugLog('AutoFill er deaktivert, hopper over');
+    return;
+  }
+
+  const loc = getEffectiveLocation();
+  if (isBlockedSite(loc.hostname, loc.href)) {
+    debugLog('Site blokkert - hopper over autofill');
     return;
   }
 
@@ -760,6 +879,7 @@ function showDebugNotification(message) {
   if (existing) existing.remove();
 
   const notification = document.createElement('div');
+  if (!notification.style) return; // Safety check for XML pages
   notification.id = 'autofill-notification';
   notification.textContent = message;
   notification.style.cssText = `
@@ -806,6 +926,9 @@ function showScanToast(stage, rulesCount = 0, fullMatches = 0, partialMatches = 
 
   const toast = document.createElement('div');
   toast.id = 'autofill-scan-toast';
+  
+  // Safety check for non-HTML pages (XML/SVG)
+  if (!toast.style) return;
 
   let content = '';
   let autoHide = false;
@@ -876,15 +999,16 @@ function showScanToast(stage, rulesCount = 0, fullMatches = 0, partialMatches = 
 
 /**
  * Finn alle redigerbare felt på siden (inkludert Shadow DOM)
+ * Optimalisert for ytelse ved å unngå querySelectorAll('*')
  */
 function findAllEditableFields(root = document) {
   const fields = [];
 
-  // Finn felter i gjeldende rot
+  // Finn felter i gjeldende rot med spesifikk selector
   const inputs = root.querySelectorAll(
     'input, select, textarea, [contenteditable="true"]'
   );
-  
+
   // Filtrer for sikkerhets skyld (querySelectorAll tar med alle input-typer)
   for (const input of inputs) {
     if (isEditableElement(input)) {
@@ -892,17 +1016,55 @@ function findAllEditableFields(root = document) {
     }
   }
 
-  // Traverser Shadow DOM
-  // querySelectorAll('*') kan være tungt på store sider, men nødvendig for å finne shadow roots
-  // uten å vite hvor de er. En optimalisering kunne være å kun lete i kjente containere.
-  const allElements = root.querySelectorAll('*');
-  for (const el of allElements) {
-    if (el.shadowRoot) {
-      fields.push(...findAllEditableFields(el.shadowRoot));
-    }
-  }
+  // Traverser Shadow DOM - optimalisert versjon
+  // Custom elements (web components) har alltid bindestrek i navnet per spec
+  // Dette er mye raskere enn querySelectorAll('*')
+  findShadowRoots(root, fields);
 
   return fields;
+}
+
+/**
+ * Rekursivt finn shadow roots og deres editable fields
+ * Optimalisert med TreeWalker for bedre ytelse enn querySelectorAll('*')
+ */
+function findShadowRoots(root, fields, depth = 0) {
+  // Begrens rekursjonsdybde for å unngå uendelig løkke
+  if (depth > 5) return;
+
+  // Bruk TreeWalker for effektiv DOM-traversering
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT,
+    {
+      acceptNode: (node) => {
+        // Custom elements har bindestrek i tag-navnet (W3C spec)
+        // Bare aksepter elementer som kan ha shadow root
+        if (node.tagName && node.tagName.includes('-')) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        // Fortsett å søke i children uansett
+        return NodeFilter.FILTER_SKIP;
+      }
+    }
+  );
+
+  let el;
+  while (el = walker.nextNode()) {
+    if (el.shadowRoot) {
+      // Finn editable fields i shadow root
+      const shadowInputs = el.shadowRoot.querySelectorAll(
+        'input, select, textarea, [contenteditable="true"]'
+      );
+      for (const input of shadowInputs) {
+        if (isEditableElement(input)) {
+          fields.push(input);
+        }
+      }
+      // Rekursivt søk i nested shadow DOMs
+      findShadowRoots(el.shadowRoot, fields, depth + 1);
+    }
+  }
 }
 
 /**
@@ -1043,12 +1205,9 @@ function matchesCondition(rule, url, field) {
     case 'urlContains':
       return value ? url.includes(value) : true;
     case 'urlRegex':
-      try {
-        return value ? new RegExp(value).test(url) : true;
-      } catch (error) {
-        debugLog('Ugyldig URL-regex i condition:', value, error);
-        return false;
-      }
+      if (!value) return true;
+      const regex = getCachedRegex(value, '');
+      return regex ? regex.test(url) : false;
     case 'selectorExists':
       try {
         return value ? !!document.querySelector(value) : false;
@@ -1087,13 +1246,8 @@ function analyzeMatches() {
 
 function matchPattern(text, pattern, useRegex) {
   if (useRegex) {
-    try {
-      const regex = new RegExp(pattern, 'i');
-      return regex.test(text);
-    } catch (error) {
-      console.error('Invalid regex:', pattern, error);
-      return false;
-    }
+    const regex = getCachedRegex(pattern, 'i');
+    return regex ? regex.test(text) : false;
   } else {
     // Wildcard matching
     return matchWildcard(text, pattern);
@@ -1101,24 +1255,21 @@ function matchPattern(text, pattern, useRegex) {
 }
 
 /**
- * Match wildcard-mønster
+ * Match wildcard-mønster (med caching)
  */
 function matchWildcard(text, pattern) {
-  // Eksakt match
+  // Eksakt match - raskeste sjekk først
   if (text === pattern) return true;
 
-  // Konverter wildcard til regex
-  const regexPattern = pattern
+  // Konverter wildcard til regex-pattern
+  const regexPattern = '^' + pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
+    .replace(/\?/g, '.') + '$';
 
-  try {
-    const regex = new RegExp(`^${regexPattern}$`);
-    return regex.test(text);
-  } catch (error) {
-    return false;
-  }
+  // Bruk cached regex med prefix for å skille fra vanlige regex
+  const regex = getCachedRegex('wildcard::' + regexPattern, '');
+  return regex ? regex.test(text) : false;
 }
 
 /**
@@ -1216,30 +1367,103 @@ function fillField(field, value) {
 }
 
 /**
- * Fyll ut select-felt
+ * Fyll ut select-felt (inkludert multi-select støtte)
+ * Håndterer optgroups, disabled options, og partial matching
  */
 function fillSelectField(selectElement, value) {
-  // Prøv å finne option med matchende value
   const options = Array.from(selectElement.options);
 
-  // Forsøk 1: Eksakt match på value
-  let matchingOption = options.find(opt => opt.value === value);
+  // Filtrer ut disabled options
+  const enabledOptions = options.filter(opt => !opt.disabled);
 
-  // Forsøk 2: Eksakt match på text
-  if (!matchingOption) {
-    matchingOption = options.find(opt => opt.text === value);
+  // Sjekk om det er multi-select
+  const isMultiple = selectElement.multiple;
+
+  if (isMultiple && value.includes(',')) {
+    // Multi-select: verdier separert med komma
+    fillMultiSelect(selectElement, enabledOptions, value);
+    return;
   }
 
-  // Forsøk 3: Case-insensitive match på text
-  if (!matchingOption) {
-    matchingOption = options.find(opt =>
-      opt.text.toLowerCase() === value.toLowerCase()
-    );
-  }
+  // Single select - finn beste match
+  let matchingOption = findBestOptionMatch(enabledOptions, value);
 
   if (matchingOption) {
     selectElement.value = matchingOption.value;
+    // Dispatch events for React/Vue compatibility
     selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    selectElement.dispatchEvent(new Event('input', { bubbles: true }));
+    debugLog('Select filled:', selectElement.name || selectElement.id, '=', matchingOption.value);
+  } else {
+    debugLog('No matching option found for:', value, 'in', selectElement.name || selectElement.id);
+  }
+}
+
+/**
+ * Finn beste matchende option
+ */
+function findBestOptionMatch(options, value) {
+  const valueLower = value.toLowerCase().trim();
+
+  // Forsøk 1: Eksakt match på value
+  let match = options.find(opt => opt.value === value);
+  if (match) return match;
+
+  // Forsøk 2: Eksakt match på text
+  match = options.find(opt => opt.text.trim() === value);
+  if (match) return match;
+
+  // Forsøk 3: Case-insensitive match på value
+  match = options.find(opt => opt.value.toLowerCase() === valueLower);
+  if (match) return match;
+
+  // Forsøk 4: Case-insensitive match på text
+  match = options.find(opt => opt.text.toLowerCase().trim() === valueLower);
+  if (match) return match;
+
+  // Forsøk 5: Partial match (text inneholder value)
+  match = options.find(opt => opt.text.toLowerCase().includes(valueLower));
+  if (match) return match;
+
+  // Forsøk 6: Value inneholder søketeksten
+  match = options.find(opt => opt.value.toLowerCase().includes(valueLower));
+  if (match) return match;
+
+  // Forsøk 7: Numerisk match (for indeks-baserte values)
+  if (/^\d+$/.test(value)) {
+    const index = parseInt(value, 10);
+    if (index >= 0 && index < options.length) {
+      return options[index];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Fyll ut multi-select felt
+ */
+function fillMultiSelect(selectElement, enabledOptions, value) {
+  const values = value.split(',').map(v => v.trim());
+
+  // Reset alle valg først
+  for (const opt of selectElement.options) {
+    opt.selected = false;
+  }
+
+  // Velg matchende options
+  let selectedCount = 0;
+  for (const val of values) {
+    const match = findBestOptionMatch(enabledOptions, val);
+    if (match) {
+      match.selected = true;
+      selectedCount++;
+    }
+  }
+
+  if (selectedCount > 0) {
+    selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    debugLog('Multi-select filled:', selectElement.name || selectElement.id, selectedCount, 'options selected');
   }
 }
 
@@ -1289,9 +1513,16 @@ async function markRuleAsUsed(ruleId) {
 
 /**
  * Observer DOM-endringer for dynamiske sider
+ * Lagrer observer-referanse for cleanup ved unload
  */
 function observeDOMChanges() {
-  const observer = new MutationObserver((mutations) => {
+  // Disconnect existing observer if any (prevents duplicates)
+  if (domObserver) {
+    domObserver.disconnect();
+    domObserver = null;
+  }
+
+  domObserver = new MutationObserver((mutations) => {
     // Sjekk om nye felt er lagt til
     let hasNewFields = false;
 
@@ -1309,15 +1540,15 @@ function observeDOMChanges() {
       if (hasNewFields) break;
     }
 
-    // Kjør autofill hvis nye felt ble funnet
+    // Kjør autofill hvis nye felt ble funnet (debounced for ytelse)
     if (hasNewFields) {
-      setTimeout(triggerAutoFill, 100);
+      debouncedTriggerAutoFill();
     }
   });
 
   const target = document.body || document.documentElement;
   if (target) {
-    observer.observe(target, {
+    domObserver.observe(target, {
       childList: true,
       subtree: true
     });
@@ -1326,9 +1557,16 @@ function observeDOMChanges() {
 
 /**
  * Observer modals som åpnes og kjør autofill når de er klare
+ * Lagrer observer-referanse for cleanup ved unload
  */
 function observeModalChanges() {
-  const modalObserver = new MutationObserver((mutations) => {
+  // Disconnect existing observer if any (prevents duplicates)
+  if (modalObserver) {
+    modalObserver.disconnect();
+    modalObserver = null;
+  }
+
+  modalObserver = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === 'attributes') {
         const target = mutation.target;
@@ -1388,12 +1626,15 @@ function observeModalChanges() {
     }
   });
 
-  modalObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['style', 'class', 'aria-modal', 'aria-hidden', 'role']
-  });
+  const target = document.body;
+  if (target) {
+    modalObserver.observe(target, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'aria-modal', 'aria-hidden', 'role']
+    });
+  }
 }
 
 /**
@@ -1645,6 +1886,27 @@ async function loadCurrentProfile() {
   console.error('Error loading current profile', e);
   }
 }
+
+/**
+ * Cleanup function - disconnects observers to prevent memory leaks
+ * Called on page unload/navigation
+ */
+function cleanup() {
+  if (domObserver) {
+    domObserver.disconnect();
+    domObserver = null;
+  }
+  if (modalObserver) {
+    modalObserver.disconnect();
+    modalObserver = null;
+  }
+  debugLog('AutoFill cleanup completed - observers disconnected');
+}
+
+// Register cleanup on page navigation to prevent memory leaks
+// NOTE: 'unload' event is deprecated and blocked by Permissions-Policy on many sites
+// Using 'pagehide' instead which is the modern replacement
+window.addEventListener('pagehide', cleanup);
 
 // End of content script
 

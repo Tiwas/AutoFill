@@ -4,7 +4,14 @@
  */
 
 // Importer nødvendige moduler
-importScripts('storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js', 'cloud.js');
+importScripts('utils.js', 'storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js', 'cloud.js');
+
+// Aktiver debug-logging basert på storage
+chrome.storage.local.get(['debugMode']).then(result => {
+  if (result.debugMode) {
+    Logger.enableDebug();
+  }
+});
 
 const CONTEXT_MENU_SET_PROFILE_PARENT = 'autofill_set_profile_parent';
 const CONTEXT_MENU_SET_PROFILE_PREFIX = 'autofill_set_profile_';
@@ -17,18 +24,19 @@ const CONTEXT_MENU_ADD_ALL = 'autofill_add_all';
  * Initialiser extension ved installasjon
  */
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('AutoFill Plugin installed');
+  Logger.info('Background', 'AutoFill Plugin installed');
   createContextMenus();
   initBadge();
-  ensureContentScriptRegistered();
+  // Content script registreres via manifest.json - ingen dynamisk registrering nødvendig
 });
 
 /**
  * Initialiser extension ved oppstart
  */
 chrome.runtime.onStartup.addListener(() => {
+  Logger.info('Background', 'AutoFill Plugin started');
   initBadge();
-  ensureContentScriptRegistered();
+  // Content script registreres via manifest.json - ingen dynamisk registrering nødvendig
 });
 
 /**
@@ -36,22 +44,31 @@ chrome.runtime.onStartup.addListener(() => {
  */
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
+    // Valider tabId
+    if (!activeInfo.tabId || typeof activeInfo.tabId !== 'number') return;
+
     const tab = await chrome.tabs.get(activeInfo.tabId);
     await updateBadgeForTab(activeInfo.tabId, tab.url);
   } catch (e) {
-    // Tab might be closed immediately
+    // Ignorer "No tab with id" feil - tab kan ha blitt lukket
+    if (e?.message?.includes('No tab with id')) return;
+    ErrorHandler.handleChromeError(e, 'onActivated');
   }
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
+    // Valider tabId
+    if (!tabId || typeof tabId !== 'number') return;
+
     // Oppdater kun når URL endres eller siden er ferdig lastet
     if (changeInfo.url || changeInfo.status === 'complete') {
       await updateBadgeForTab(tabId, tab.url);
     }
   } catch (e) {
-    // Ignore errors if tab was closed during update
-    console.debug('Error in onUpdated:', e);
+    // Ignorer "No tab with id" feil - tab kan ha blitt lukket
+    if (e?.message?.includes('No tab with id')) return;
+    ErrorHandler.handleChromeError(e, 'onUpdated');
   }
 });
 
@@ -70,7 +87,7 @@ async function initBadge() {
     const enabled = result.autofillEnabled !== false; // Default true
     await updateBadge(enabled);
   } catch (error) {
-    console.error('Error initializing badge:', error);
+    ErrorHandler.handleChromeError(error, 'initBadge');
   }
 }
 
@@ -82,7 +99,7 @@ async function updateBadge(autofillEnabled) {
   try {
     await updateBadgeForCurrentTab();
   } catch (error) {
-    console.error('Error updating badge:', error);
+    ErrorHandler.handleChromeError(error, 'updateBadge');
   }
 }
 
@@ -174,25 +191,47 @@ async function updateBadgeForCurrentTab() {
     const tab = tabs[0];
     await updateBadgeForTab(tab.id, tab.url);
   } catch (error) {
+    if (error.message && error.message.includes('No tab with id')) return;
     console.error('Error updating badge for current tab:', error);
+  }
+}
+
+// Hjelpefunksjon for å sette badge trygt (ignorer feil hvis tab er lukket)
+async function safeBadgeUpdate(tabId, { text, color, title }) {
+  try {
+    if (text !== undefined) await chrome.action.setBadgeText({ text, tabId });
+    if (color) await chrome.action.setBadgeBackgroundColor({ color, tabId });
+    if (title) await chrome.action.setTitle({ title, tabId });
+  } catch (e) {
+    // Tab er sannsynligvis lukket - ignorer stille
   }
 }
 
 async function updateBadgeForTab(tabId, url) {
   try {
+    // Valider tabId først
+    if (!tabId || typeof tabId !== 'number') {
+      return;
+    }
+
+    // Sjekk om tab fortsatt eksisterer før vi gjør noe
+    try {
+      await chrome.tabs.get(tabId);
+    } catch (e) {
+      // Tab eksisterer ikke lenger, ignorer stille
+      return;
+    }
+
     // Sjekk først om autofill er avslått
     const settings = await chrome.storage.local.get(['autofillEnabled']);
     if (settings.autofillEnabled === false) {
-      chrome.action.setBadgeText({ text: 'OFF', tabId });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin - Deaktivert', tabId });
+      await safeBadgeUpdate(tabId, { text: 'OFF', color: '#ef4444', title: 'AutoFill Plugin - Deaktivert' });
       return;
     }
 
     // Ignorer chrome:// og chrome-extension:// sider
     if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-      chrome.action.setBadgeText({ text: '', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin', tabId });
+      await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin' });
       return;
     }
 
@@ -204,15 +243,12 @@ async function updateBadgeForTab(tabId, url) {
     const matchingRules = await Storage.getRulesForSite(url, profileId);
 
     if (matchingRules.length === 0) {
-      chrome.action.setBadgeText({ text: '', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin', tabId });
+      await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin' });
       return;
     }
 
     // Sett midlertidig "?" mens vi skanner felter
-    chrome.action.setBadgeText({ text: '?', tabId });
-    chrome.action.setBadgeBackgroundColor({ color: '#667eea', tabId });
-    chrome.action.setTitle({ title: 'AutoFill Plugin - scanning fields…', tabId });
+    await safeBadgeUpdate(tabId, { text: '?', color: '#667eea', title: 'AutoFill Plugin - scanning fields…' });
 
     // Prøv å hente felt fra siden for å kategorisere regler
     let fullMatches = 0;
@@ -244,32 +280,24 @@ async function updateBadgeForTab(tabId, url) {
         }
       } else {
         // Ingen felter tilgjengelig enda; la popup/CS oppdatere senere
-        chrome.action.setBadgeText({ text: '?', tabId });
-        chrome.action.setBadgeBackgroundColor({ color: '#667eea', tabId });
-        chrome.action.setTitle({ title: 'AutoFill Plugin - scanning…', tabId });
+        await safeBadgeUpdate(tabId, { text: '?', color: '#667eea', title: 'AutoFill Plugin - scanning…' });
         return;
       }
     } catch (e) {
       // Content script ikke tilgjengelig ennå; behold '?' og la popup/CS oppdatere senere
-      chrome.action.setBadgeText({ text: '?', tabId });
-      chrome.action.setBadgeBackgroundColor({ color: '#667eea', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin - scanning…', tabId });
+      await safeBadgeUpdate(tabId, { text: '?', color: '#667eea', title: 'AutoFill Plugin - scanning…' });
       return;
     }
 
     // Vis kun full matches i badge
     if (fullMatches > 0) {
-      chrome.action.setBadgeText({ text: fullMatches.toString(), tabId });
-      chrome.action.setBadgeBackgroundColor({ color: '#667eea', tabId });
-      chrome.action.setTitle({
-        title: `AutoFill Plugin - ${fullMatches} ${fullMatches === 1 ? 'match' : 'matches'}${partialMatches > 0 ? `, ${partialMatches} partial` : ''}`,
-        tabId
-      });
+      const title = `AutoFill Plugin - ${fullMatches} ${fullMatches === 1 ? 'match' : 'matches'}${partialMatches > 0 ? `, ${partialMatches} partial` : ''}`;
+      await safeBadgeUpdate(tabId, { text: fullMatches.toString(), color: '#667eea', title });
     } else {
-      chrome.action.setBadgeText({ text: '', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin', tabId });
+      await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin' });
     }
   } catch (error) {
+    if (error.message && error.message.includes('No tab with id')) return;
     console.error('Error updating badge for tab:', error);
   }
 }
@@ -338,24 +366,31 @@ function checkRuleMatchesFields(rule, fields) {
  */
 async function updateBadgeWithCounts(tabId, fullMatches, partialMatches) {
   try {
+    // Valider tabId først
+    if (!tabId || typeof tabId !== 'number') {
+      return;
+    }
+
+    // Sjekk om tab fortsatt eksisterer
+    try {
+      await chrome.tabs.get(tabId);
+    } catch (e) {
+      // Tab eksisterer ikke lenger, ignorer stille
+      return;
+    }
+
     // Sjekk først om autofill er avslått
     const settings = await chrome.storage.local.get(['autofillEnabled']);
     if (settings.autofillEnabled === false) {
-      chrome.action.setBadgeText({ text: 'OFF', tabId });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin - Deaktivert', tabId });
+      await safeBadgeUpdate(tabId, { text: 'OFF', color: '#ef4444', title: 'AutoFill Plugin - Deaktivert' });
       return;
     }
 
     // Vis kun antall full matches
     if (fullMatches === 0) {
-      chrome.action.setBadgeText({ text: '', tabId });
-      chrome.action.setTitle({ title: 'AutoFill Plugin', tabId });
+      await safeBadgeUpdate(tabId, { text: '', title: 'AutoFill Plugin' });
       return;
     }
-
-    chrome.action.setBadgeText({ text: fullMatches.toString(), tabId });
-    chrome.action.setBadgeBackgroundColor({ color: '#667eea', tabId });
 
     // Oppdater tooltip
     let title = 'AutoFill Plugin';
@@ -367,8 +402,9 @@ async function updateBadgeWithCounts(tabId, fullMatches, partialMatches) {
       title = `AutoFill Plugin - ${partialMatches} partial ${partialMatches === 1 ? 'match' : 'matches'}`;
     }
 
-    chrome.action.setTitle({ title, tabId });
+    await safeBadgeUpdate(tabId, { text: fullMatches.toString(), color: '#667eea', title });
   } catch (error) {
+    if (error.message && error.message.includes('No tab with id')) return;
     console.error('Error updating badge with counts:', error);
   }
 }
@@ -413,6 +449,7 @@ async function showAddFieldDialog(field, tabId) {
 
     console.log('Rule added:', savedRule);
   } catch (error) {
+    if (error.message && error.message.includes('No tab with id')) return;
     console.warn('Could not add field (tab closed?):', error);
   }
 }
@@ -459,6 +496,7 @@ async function showAddMultipleFieldsDialog(fields, tabId) {
 
     console.log(`${fields.length} rules added`);
   } catch (error) {
+    if (error.message && error.message.includes('No tab with id')) return;
     console.warn('Could not add fields (tab closed?):', error);
   }
 }
@@ -640,24 +678,9 @@ async function injectContentScript(tabId, url) {
   }
 }
 
-async function ensureContentScriptRegistered() {
-  try {
-    // Unregister first to clear any old registration with allFrames: true
-    await chrome.scripting.unregisterContentScripts({ids: ['autofill-content']}).catch(() => {});
-
-    // Register with allFrames: false to match manifest.json
-    await chrome.scripting.registerContentScripts([{
-      id: 'autofill-content',
-      js: ['content.js'],
-      matches: ['<all_urls>'],
-      runAt: 'document_idle',
-      allFrames: true,
-      persistAcrossSessions: true
-    }]);
-  } catch (e) {
-    // Already registered or not supported; safe to ignore.
-  }
-}
+// FJERNET: ensureContentScriptRegistered()
+// Content script registreres nå KUN via manifest.json for å unngå duplikat-injeksjon.
+// Den gamle dynamiske registreringen kunne forårsake at content.js ble kjørt to ganger.
 
 // Override with fallback-aware handlers
 async function handleAddFieldSafe(tabId, info) {
@@ -686,13 +709,13 @@ const response = await sendMessageWithFallback(tabId, {
 }
 
 /**
- * Håndter feil
+ * Håndter globale feil
  */
 self.addEventListener('error', (event) => {
-  console.error('Background script error:', event.error);
+  Logger.error('Background', 'Uncaught error:', event.error);
 });
 
-console.log('Background service worker started');
+Logger.info('Background', 'Service worker initialized');
 
 function notifyCannotCapture(message) {
   chrome.notifications.create({

@@ -1348,12 +1348,14 @@ async function loadPageRules() {
       const partialMatchCount = 0;
       applyFilters();
       updateStats();
-      chrome.runtime.sendMessage({
-        action: 'updateBadgeCount',
-        tabId: currentTab.id,
-        fullMatches: fullMatchCount,
-        partialMatches: partialMatchCount
-      }).catch(err => console.error('Failed to update badge:', err));
+      if (currentTab?.id) {
+        chrome.runtime.sendMessage({
+          action: 'updateBadgeCount',
+          tabId: currentTab.id,
+          fullMatches: fullMatchCount,
+          partialMatches: partialMatchCount
+        }).catch(() => {}); // Ignorer feil - tab kan være lukket
+      }
       return;
     }
 
@@ -1370,12 +1372,14 @@ async function loadPageRules() {
     // Oppdater badge med antall full matches
     const fullMatchCount = pageRules.filter(r => r.matchType === 'full').length;
     const partialMatchCount = pageRules.filter(r => r.matchType === 'partial').length;
-    chrome.runtime.sendMessage({
-      action: 'updateBadgeCount',
-      tabId: currentTab.id,
-      fullMatches: fullMatchCount,
-      partialMatches: partialMatchCount
-    }).catch(err => console.error('Failed to update badge:', err));
+    if (currentTab?.id) {
+      chrome.runtime.sendMessage({
+        action: 'updateBadgeCount',
+        tabId: currentTab.id,
+        fullMatches: fullMatchCount,
+        partialMatches: partialMatchCount
+      }).catch(() => {}); // Ignorer feil - tab kan være lukket
+    }
 
     applyFilters();
     updateStats();
@@ -3087,9 +3091,10 @@ function formatDate(timestamp) {
 }
 
 /**
- * Test match på aktiv side (uten å fylle ut)
+ * Test match på aktiv side (uten å fylle ut) - Legacy funksjon, erstattet av handleTestMatch nedenfor
  */
-async function handleTestMatch() {
+async function handleTestMatchLegacy() {
+  if (!currentTab?.id) return;
   const t = translations.current || translations.en;
   try {
     const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'testMatches', profileId: currentProfileId });

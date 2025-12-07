@@ -201,3 +201,34 @@ background.js; content.js; popup.js; storage.js; SESSION.md
 ### Neste Steg
 - Manuell verifisering: badge oppdateres på sidelast uten popup, matcher korrekt med aktiv profil, og regex-regler teller riktig.
 - Test force fill/test match på profiler med blandede regex/wildcard felt.
+
+## Sesjon 12 - 2025-12-07
+
+### Mål
+Fikse to feil som oppsto etter tidligere endringer:
+1. "Permissions policy violation: unload is not allowed in this document."
+2. "Uncaught (in promise) Error: No tab with id: <nr>."
+
+### Gjennomført
+1. **Fjernet deprecated `unload` event (content.js)**
+   - `unload`-eventet er deprecated og blokkeres av Permissions-Policy på mange moderne sider.
+   - Fjernet `window.addEventListener('unload', cleanup)`, beholder kun `pagehide`.
+
+2. **Robust feilhåndtering for badge-operasjoner (background.js)**
+   - Ny `safeBadgeUpdate()` hjelpefunksjon som wrapper alle `chrome.action.*`-kall i try-catch.
+   - Oppdatert `updateBadgeForTab()` og `updateBadgeWithCounts()` til å bruke `safeBadgeUpdate()`.
+   - Lagt til tabId-validering og "No tab with id"-feilhåndtering i tab-listeners.
+
+3. **Null-sjekker for currentTab (popup.js)**
+   - Lagt til `if (currentTab?.id)` før `updateBadgeCount`-meldinger.
+   - Omdøpt duplikat `handleTestMatch` til `handleTestMatchLegacy` for å unngå konflikt.
+
+4. **Dokumentasjon**
+   - Oppdatert ISSUES.md med detaljert beskrivelse av feilrettingene.
+
+### Filer Oppdatert
+content.js; background.js; popup.js; ISSUES.md; SESSION.md
+
+### Neste Steg
+- Verifiser at feilmeldingene er borte etter reload av utvidelsen.
+- Test badge-oppdatering på tvers av tabs og vinduer.

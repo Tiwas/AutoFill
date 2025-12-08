@@ -12,13 +12,13 @@ let selectMode = false;
 
 const elements = {};
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initElements();
   attachEvents();
-  loadSettings();
-  loadProfiles();
-  loadVariables();
-  loadRules();
+  await loadSettings();
+  await loadProfiles();
+  await loadVariables();
+  await loadRules();
 });
 
 function initElements() {
@@ -34,17 +34,18 @@ function initElements() {
   elements.activeRules = document.getElementById('activeRules');
   elements.regexRules = document.getElementById('regexRules');
   elements.selectedCount = document.getElementById('selectedCount');
+  elements.currentProfileName = document.getElementById('currentProfileName');
   elements.searchRegex = document.getElementById('searchRegex');
   elements.searchMatchFields = document.getElementById('searchMatchFields');
   elements.searchMatchValues = document.getElementById('searchMatchValues');
-  elements.exportSelectedBtn = document.getElementById('exportSelectedBtn');
   elements.importRulesBtn = document.getElementById('importRulesBtn');
-  elements.validateRulesBtn = document.getElementById('validateRulesBtn');
   elements.refreshBtn = document.getElementById('refreshBtn');
   elements.importFile = document.getElementById('importFile');
-  elements.validateFile = document.getElementById('validateFile');
-  elements.openPopupBtn = document.getElementById('openPopupBtn');
   elements.mergeFilteredBtn = document.getElementById('mergeFilteredBtn');
+
+  // Filter panel
+  elements.toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+  elements.advancedFilters = document.getElementById('advancedFilters');
   elements.cloudBackupBtn = document.getElementById('cloudBackupBtn');
   elements.cloudRestoreBtn = document.getElementById('cloudRestoreBtn');
   elements.cloudSettingsBtn = document.getElementById('cloudSettingsBtn');
@@ -67,12 +68,14 @@ function initElements() {
   elements.aiAssistBtn = document.getElementById('aiAssistBtn');
   elements.optimizeBtn = document.getElementById('optimizeBtn');
   elements.variablesBtn = document.getElementById('variablesBtn');
-  elements.selectModeBtn = document.getElementById('selectModeBtn');
   elements.addRuleBtn = document.getElementById('addRuleBtn');
   elements.selectionBar = document.getElementById('selectionBar');
   elements.selectionCount = document.getElementById('selectionCount');
   elements.bulkEnable = document.getElementById('bulkEnable');
   elements.bulkDisable = document.getElementById('bulkDisable');
+  elements.bulkMoveBtn = document.getElementById('bulkMoveBtn');
+  elements.bulkMoveProfile = document.getElementById('bulkMoveProfile');
+  elements.bulkExport = document.getElementById('bulkExport');
   elements.bulkDelete = document.getElementById('bulkDelete');
   elements.exitSelectMode = document.getElementById('exitSelectMode');
   elements.optimizerSection = document.getElementById('optimizerSection');
@@ -107,6 +110,7 @@ function initElements() {
   elements.variableForms = Array.from(document.querySelectorAll('[data-variable-form]'));
   elements.ruleProfileSelect = document.getElementById('ruleProfileSelect');
   elements.lblRuleProfile = document.getElementById('lblRuleProfile');
+  elements.openSettingsBtn = document.getElementById('openSettingsBtn');
 
   // Nye elementer for v0.4.0+
   elements.selectAllCheckbox = document.getElementById('selectAllCheckbox');
@@ -144,24 +148,48 @@ function attachEvents() {
   if (elements.aiAssistBtn) elements.aiAssistBtn.addEventListener('click', openAiModal);
   if (elements.optimizeBtn) elements.optimizeBtn.addEventListener('click', showOptimizer);
   if (elements.variablesBtn) elements.variablesBtn.addEventListener('click', openVariablesModal);
-  if (elements.selectModeBtn) elements.selectModeBtn.addEventListener('click', toggleSelectMode);
   if (elements.addRuleBtn) elements.addRuleBtn.addEventListener('click', () => openEditModal());
   if (elements.bulkEnable) elements.bulkEnable.addEventListener('click', () => handleBulkAction('enable'));
   if (elements.bulkDisable) elements.bulkDisable.addEventListener('click', () => handleBulkAction('disable'));
+  if (elements.bulkMoveBtn) elements.bulkMoveBtn.addEventListener('click', toggleMoveProfileDropdown);
+  if (elements.bulkMoveProfile) elements.bulkMoveProfile.addEventListener('change', handleBulkMoveToProfile);
+  if (elements.bulkExport) elements.bulkExport.addEventListener('click', exportSelected);
   if (elements.bulkDelete) elements.bulkDelete.addEventListener('click', () => handleBulkAction('delete'));
-  if (elements.exitSelectMode) elements.exitSelectMode.addEventListener('click', toggleSelectMode);
+  if (elements.exitSelectMode) elements.exitSelectMode.addEventListener('click', clearSelection);
+
+  // Filter panel toggle
+  if (elements.toggleFiltersBtn) elements.toggleFiltersBtn.addEventListener('click', toggleFiltersPanel);
+
+  // Settings modal
+  if (elements.openSettingsBtn) elements.openSettingsBtn.addEventListener('click', () => SettingsModal.open());
 
   elements.searchInput.addEventListener('input', applyFilters);
-  if (elements.searchRegex) elements.searchRegex.addEventListener('change', applyFilters);
-  if (elements.searchMatchFields) elements.searchMatchFields.addEventListener('change', applyFilters);
-  if (elements.searchMatchValues) elements.searchMatchValues.addEventListener('change', applyFilters);
+  if (elements.searchRegex) elements.searchRegex.addEventListener('change', () => {
+    applyFilters();
+    saveFilterStates();
+  });
+  if (elements.searchMatchFields) elements.searchMatchFields.addEventListener('change', () => {
+    applyFilters();
+    saveFilterStates();
+  });
+  if (elements.searchMatchValues) elements.searchMatchValues.addEventListener('change', () => {
+    applyFilters();
+    saveFilterStates();
+  });
   if (elements.searchMode) elements.searchMode.addEventListener('change', applyFilters);
-  elements.filterEnabled.addEventListener('change', applyFilters);
-  elements.filterRegex.addEventListener('change', applyFilters);
+  elements.filterEnabled.addEventListener('change', () => {
+    applyFilters();
+    saveFilterStates();
+  });
+  elements.filterRegex.addEventListener('change', () => {
+    applyFilters();
+    saveFilterStates();
+  });
   syncSearchModeLock();
   elements.groupBySite.addEventListener('change', () => {
     groupBySite = elements.groupBySite.checked;
     renderRules();
+    saveFilterStates();
   });
   if (elements.activeProfileSelect) {
     elements.activeProfileSelect.addEventListener('change', handleActiveProfileChange);
@@ -169,8 +197,8 @@ function attachEvents() {
   elements.sortBy.addEventListener('change', () => {
     sortBy = elements.sortBy.value;
     renderRules();
+    saveFilterStates();
   });
-  elements.exportSelectedBtn.addEventListener('click', exportSelected);
   elements.importRulesBtn.addEventListener('click', () => elements.importFile.click());
   elements.importFile.addEventListener('change', (ev) => handleImport(ev, 'import'));
   
@@ -230,73 +258,187 @@ function attachEvents() {
 }
 
 async function loadSettings() {
-  const result = await chrome.storage.local.get(['blacklist', 'notificationsEnabled', 'language', 'userVariables', 'currentProfileId']);
-  
-  if (result.blacklist && Array.isArray(result.blacklist)) {
-    if (elements.blacklistRules) {
-        elements.blacklistRules.value = result.blacklist.join('\n');
-    }
-  }
-  
-  if (elements.notificationToggle) {
-      elements.notificationToggle.checked = result.notificationsEnabled !== false; // Default true
+  // Load sync settings (shared across Chrome profiles)
+  let syncResult = {};
+  try {
+    syncResult = await chrome.storage.sync.get(['blacklist', 'notificationsEnabled', 'language', 'userVariables']);
+  } catch (e) {
+    syncResult = await chrome.storage.local.get(['blacklist', 'notificationsEnabled', 'language', 'userVariables']);
   }
 
-  userVariables = result.userVariables || {};
-  currentProfileId = result.currentProfileId || 'default';
+  // Load local settings (UI state, profile-specific)
+  const localResult = await chrome.storage.local.get([
+    'currentProfileId', 'filtersExpanded',
+    'filterEnabled', 'filterRegex', 'searchRegex',
+    'searchMatchFields', 'searchMatchValues', 'groupBySite', 'sortBy'
+  ]);
+
+  if (syncResult.blacklist && Array.isArray(syncResult.blacklist)) {
+    if (elements.blacklistRules) {
+      elements.blacklistRules.value = syncResult.blacklist.join('\n');
+    }
+  }
+
+  if (elements.notificationToggle) {
+    elements.notificationToggle.checked = syncResult.notificationsEnabled !== false; // Default true
+  }
+
+  // Restore filter panel state
+  if (elements.advancedFilters && elements.toggleFiltersBtn) {
+    const isExpanded = localResult.filtersExpanded === true;
+    elements.advancedFilters.classList.toggle('collapsed', !isExpanded);
+    elements.toggleFiltersBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    const icon = elements.toggleFiltersBtn.querySelector('.toggle-icon');
+    if (icon) icon.textContent = isExpanded ? '▲' : '▼';
+  }
+
+  // Restore filter checkbox states
+  if (elements.filterEnabled) elements.filterEnabled.checked = localResult.filterEnabled || false;
+  if (elements.filterRegex) elements.filterRegex.checked = localResult.filterRegex || false;
+  if (elements.searchRegex) elements.searchRegex.checked = localResult.searchRegex || false;
+  if (elements.searchMatchFields) elements.searchMatchFields.checked = localResult.searchMatchFields !== false;
+  if (elements.searchMatchValues) elements.searchMatchValues.checked = localResult.searchMatchValues || false;
+  if (elements.groupBySite) {
+    elements.groupBySite.checked = localResult.groupBySite !== false;
+    groupBySite = elements.groupBySite.checked;
+  }
+  if (elements.sortBy && localResult.sortBy) {
+    elements.sortBy.value = localResult.sortBy;
+    sortBy = localResult.sortBy;
+  }
+
+  userVariables = syncResult.userVariables || {};
+  currentProfileId = localResult.currentProfileId || 'default';
   applyTranslations();
 }
 
 async function saveBlacklist() {
   const text = elements.blacklistRules.value;
   const blacklist = text.split('\n').map(s => s.trim()).filter(Boolean);
-  
-  await chrome.storage.local.set({ blacklist });
-  
-  chrome.runtime.sendMessage({ 
-    action: 'updateSettings', 
-    blacklist 
+
+  try {
+    await chrome.storage.sync.set({ blacklist });
+  } catch (e) {
+    await chrome.storage.local.set({ blacklist });
+  }
+
+  chrome.runtime.sendMessage({
+    action: 'updateSettings',
+    blacklist
   });
-  
+
   const t = TRANSLATIONS.current || TRANSLATIONS.en || {};
   alert(t.toast?.saved || 'Settings saved');
 }
 
 async function saveNotificationSetting() {
   const enabled = elements.notificationToggle.checked;
-  await chrome.storage.local.set({ notificationsEnabled: enabled });
-  
-  chrome.runtime.sendMessage({ 
-    action: 'updateSettings', 
-    notificationsEnabled: enabled 
+
+  try {
+    await chrome.storage.sync.set({ notificationsEnabled: enabled });
+  } catch (e) {
+    await chrome.storage.local.set({ notificationsEnabled: enabled });
+  }
+
+  chrome.runtime.sendMessage({
+    action: 'updateSettings',
+    notificationsEnabled: enabled
   });
 }
 
 function handleSelectAll(e) {
   const checked = e.target.checked;
   selectedRules.clear();
-  
+
   if (checked) {
     // Velg kun de som er synlige i filteret
     filteredRules.forEach(rule => selectedRules.add(rule.id));
   }
 
+  updateSelectionUi();
   renderRules();
   updateStats();
 }
 
-function toggleSelectMode() {
-  if (selectedRules.size > 0) {
-    // If items selected, clear them (this effectively exits select mode via updateSelectionUi)
-    selectedRules.clear();
-  } else {
-    // If nothing selected, user wants to enter mode manually?
-    // Or maybe "Select All"? Let's just toggle the boolean for manual entry if needed,
-    // but mostly this button acts as "Cancel" now when active.
-    selectMode = !selectMode;
+function clearSelection() {
+  selectedRules.clear();
+  // Hide move profile dropdown if open
+  if (elements.bulkMoveProfile) {
+    elements.bulkMoveProfile.style.display = 'none';
   }
   updateSelectionUi();
   renderRules();
+}
+
+function toggleFiltersPanel() {
+  const panel = elements.advancedFilters;
+  const btn = elements.toggleFiltersBtn;
+  if (!panel || !btn) return;
+
+  const isCollapsed = panel.classList.contains('collapsed');
+  panel.classList.toggle('collapsed', !isCollapsed);
+  btn.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+  btn.querySelector('.toggle-icon').textContent = isCollapsed ? '▲' : '▼';
+
+  // Save state
+  chrome.storage.local.set({ filtersExpanded: isCollapsed });
+}
+
+function saveFilterStates() {
+  chrome.storage.local.set({
+    filterEnabled: elements.filterEnabled?.checked || false,
+    filterRegex: elements.filterRegex?.checked || false,
+    searchRegex: elements.searchRegex?.checked || false,
+    searchMatchFields: elements.searchMatchFields?.checked !== false,
+    searchMatchValues: elements.searchMatchValues?.checked || false,
+    groupBySite: elements.groupBySite?.checked !== false,
+    sortBy: elements.sortBy?.value || 'newest'
+  });
+}
+
+function toggleMoveProfileDropdown() {
+  if (!elements.bulkMoveProfile) return;
+
+  const isVisible = elements.bulkMoveProfile.style.display !== 'none';
+  if (isVisible) {
+    elements.bulkMoveProfile.style.display = 'none';
+  } else {
+    // Populate with profiles except current
+    elements.bulkMoveProfile.innerHTML = '<option value="">Select profile...</option>';
+    profiles.forEach(p => {
+      if (p.id !== currentProfileId) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        elements.bulkMoveProfile.appendChild(opt);
+      }
+    });
+    elements.bulkMoveProfile.style.display = 'inline-block';
+  }
+}
+
+async function handleBulkMoveToProfile() {
+  const targetProfileId = elements.bulkMoveProfile.value;
+  if (!targetProfileId || selectedRules.size === 0) return;
+
+  const count = selectedRules.size;
+  for (const ruleId of selectedRules) {
+    await chrome.runtime.sendMessage({
+      action: 'updateRule',
+      ruleId,
+      updates: { profileId: targetProfileId }
+    });
+  }
+
+  // Hide dropdown and clear selection
+  elements.bulkMoveProfile.style.display = 'none';
+  selectedRules.clear();
+  updateSelectionUi();
+  await loadRules();
+
+  const targetProfile = profiles.find(p => p.id === targetProfileId);
+  const msg = TRANSLATIONS.current?.rulesPage?.messages?.movedToProfile || 'Moved {count} rules to {profile}';
+  alert(msg.replace('{count}', count).replace('{profile}', targetProfile?.name || targetProfileId));
 }
 
 async function loadRules() {
@@ -304,11 +446,29 @@ async function loadRules() {
   elements.rulesContainer.innerHTML = `<p class="empty">${escapeHtml(loadingText)}</p>`;
   const response = await chrome.runtime.sendMessage({ action: 'getAllRules' });
   allRules = response || [];
+  // Refresh profile selector to update orphaned count
+  renderActiveProfileSelect();
   applyFilters();
 }
 
 function applyFilters() {
-  const sourceRules = currentProfileId ? allRules.filter(r => (r.profileId || 'default') === currentProfileId) : allRules;
+  // Always filter by profile (use 'default' as fallback), or show orphaned if '__ORPHANED__'
+  const profileId = currentProfileId || 'default';
+  const showOrphaned = profileId === '__ORPHANED__';
+
+  // Valid profile IDs for orphan detection
+  const validProfileIds = new Set(profiles.map(p => p.id));
+
+  // Treat rules without profileId (or empty string) as belonging to 'default'
+  const sourceRules = showOrphaned
+    ? allRules.filter(r => {
+        const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+        return !validProfileIds.has(ruleProfile);
+      })
+    : allRules.filter(r => {
+        const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+        return ruleProfile === profileId;
+      });
   const rawTerm = elements.searchInput.value.trim();
   const useRegex = elements.searchRegex?.checked;
   const matchFields = elements.searchMatchFields?.checked !== false;
@@ -381,12 +541,49 @@ function applyFilters() {
 }
 
 function updateStats() {
-  const base = currentProfileId ? allRules.filter(r => (r.profileId || 'default') === currentProfileId) : allRules;
-  elements.totalRules.textContent = base.length;
+  // Always filter by profile (use 'default' as fallback), or show orphaned if '__ORPHANED__'
+  const profileId = currentProfileId || 'default';
+  const showOrphaned = profileId === '__ORPHANED__';
+
+  // Valid profile IDs for orphan detection
+  const validProfileIds = new Set(profiles.map(p => p.id));
+
+  // Count orphaned rules
+  const orphanedCount = allRules.filter(r => {
+    const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+    return !validProfileIds.has(ruleProfile);
+  }).length;
+
+  // Treat rules without profileId (or empty string) as belonging to 'default'
+  const base = showOrphaned
+    ? allRules.filter(r => {
+        const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+        return !validProfileIds.has(ruleProfile);
+      })
+    : allRules.filter(r => {
+        const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+        return ruleProfile === profileId;
+      });
+
+  // Show count with orphaned indicator: "150 (11)" where 11 is orphaned count
+  const countText = orphanedCount > 0 && !showOrphaned
+    ? `${base.length} (${orphanedCount} orphaned)`
+    : `${base.length}`;
+  elements.totalRules.textContent = countText;
+
   elements.activeRules.textContent = base.filter(r => r.enabled).length;
   elements.regexRules.textContent = base.filter(r => r.fieldUseRegex).length;
   if (elements.selectedCount) {
-      elements.selectedCount.textContent = selectedRules.size;
+    elements.selectedCount.textContent = selectedRules.size;
+  }
+  // Update profile name in summary panel
+  if (elements.currentProfileName) {
+    if (showOrphaned) {
+      elements.currentProfileName.textContent = 'Orphaned rules';
+    } else {
+      const profile = profiles.find(p => p.id === profileId);
+      elements.currentProfileName.textContent = profile?.name || profileId;
+    }
   }
 }
 
@@ -401,27 +598,22 @@ function updateSelectionUi() {
     const allVisibleSelected = filteredRules.length > 0 && filteredRules.every(r => selectedRules.has(r.id));
     elements.selectAllCheckbox.checked = allVisibleSelected;
   }
-  
+
   // Auto-toggle select mode based on selection
   const hasSelection = selectedRules.size > 0;
   selectMode = hasSelection; // Sync state variable
-  
+
   // Toggle bars
   if (elements.selectionBar) {
     elements.selectionBar.style.display = hasSelection ? 'flex' : 'none';
   }
   if (elements.floatingActions) {
-      elements.floatingActions.style.display = hasSelection ? 'none' : 'flex';
+    elements.floatingActions.style.display = hasSelection ? 'none' : 'flex';
   }
-  
-  // Update Select All text if needed (e.g. "Cancel" vs "Select All")
-  if (elements.selectModeBtn) {
-      // We can reuse this button as a manual toggle if user wants to enter mode without selecting
-      // or just hide it if auto-detect is preferred. Let's keep it as "Select Multiple" for now
-      // but maybe change text to "Cancel Selection" if active.
-      elements.selectModeBtn.textContent = hasSelection ? 
-        (TRANSLATIONS.current?.buttons?.cancel || 'Cancel') : 
-        (TRANSLATIONS.current?.buttons?.selectModeBtn || 'Select Multiple');
+
+  // Hide move dropdown when selection changes
+  if (elements.bulkMoveProfile && !hasSelection) {
+    elements.bulkMoveProfile.style.display = 'none';
   }
 }
 
@@ -697,6 +889,15 @@ function createRuleRow(rule, allowDrag, isConflict = false, conflictWinners = ne
 
   const meta = document.createElement('div');
   meta.className = 'rule-meta';
+
+  // Show profile badge when viewing orphaned rules
+  if (currentProfileId === '__ORPHANED__') {
+    const ruleProfile = (typeof rule.profileId === 'string' && rule.profileId.trim()) || 'default';
+    const profileObj = profiles.find(p => p.id === ruleProfile);
+    const profileName = profileObj?.name || ruleProfile;
+    meta.innerHTML += `<span class="pill" style="background:#ef4444;color:white;">⚠️ ${escapeHtml(profileName)}</span>`;
+  }
+
   if (rule.fieldUseRegex) meta.innerHTML += '<span class="pill">Regex</span>';
   meta.innerHTML += `<span class="pill">${escapeHtml(matchLabels[rule.siteMatchType] || rule.siteMatchType)}</span>`;
   if (rule.lastUsed) {
@@ -1147,7 +1348,7 @@ async function handleBulkAction(action) {
     }
   }
   selectedRules.clear();
-  toggleSelectMode();
+  updateSelectionUi();
   await loadRules();
 }
 
@@ -1893,12 +2094,34 @@ function renderProfileSelect() {
 function renderActiveProfileSelect() {
   if (!elements.activeProfileSelect || !profiles) return;
   elements.activeProfileSelect.innerHTML = '';
+
   profiles.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
     opt.textContent = p.name;
     elements.activeProfileSelect.appendChild(opt);
   });
+
+  // Count orphaned rules (profileId doesn't match any existing profile)
+  const validProfileIds = new Set(profiles.map(p => p.id));
+  const orphanedCount = allRules.filter(r => {
+    const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+    return !validProfileIds.has(ruleProfile);
+  }).length;
+
+  // Add "Show orphaned" option if there are any
+  if (orphanedCount > 0) {
+    const sep = document.createElement('option');
+    sep.disabled = true;
+    sep.textContent = '────────────';
+    elements.activeProfileSelect.appendChild(sep);
+
+    const orphanOpt = document.createElement('option');
+    orphanOpt.value = '__ORPHANED__';
+    orphanOpt.textContent = `⚠️ Orphaned rules (${orphanedCount})`;
+    elements.activeProfileSelect.appendChild(orphanOpt);
+  }
+
   const target = currentProfileId || 'default';
   elements.activeProfileSelect.value = target;
 }
@@ -1906,8 +2129,15 @@ function renderActiveProfileSelect() {
 function handleActiveProfileChange() {
   if (!elements.activeProfileSelect) return;
   currentProfileId = elements.activeProfileSelect.value || 'default';
-  chrome.storage.local.set({ currentProfileId });
-  chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId: currentProfileId }).catch(() => {});
+
+  // Don't save '__ORPHANED__' as the active profile - it's just for viewing
+  if (currentProfileId !== '__ORPHANED__') {
+    chrome.storage.local.set({ currentProfileId });
+    chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId: currentProfileId }).catch(() => {});
+    // Refresh context menu to update checkmark
+    chrome.runtime.sendMessage({ action: 'refreshContextMenus' }).catch(() => {});
+  }
+
   applyFilters();
 }
 
@@ -2012,18 +2242,18 @@ function applyTranslations() {
   setText(document.getElementById('blacklistTitle'), t.headings?.blacklistTitle);
   setText(document.getElementById('settingsTitle'), t.headings?.settingsTitle);
   setText(document.getElementById('variablesHeading'), t.headings?.variablesUsage);
-  setText(elements.validateRulesBtn, t.buttons?.validateBtn);
 
   // Header actions
   if (page.actions) {
     setText(elements.refreshBtn, page.actions.refresh);
-    setText(elements.exportSelectedBtn, page.actions.exportSelected);
     setText(elements.importRulesBtn, page.actions.import);
     setText(elements.cloudRestoreBtn, page.actions.restore || t.cloud?.restore);
     setText(elements.cloudBackupBtn, page.actions.backup || t.cloud?.backup);
     setText(elements.mergeFilteredBtn, page.actions.mergeFiltered);
-    setText(elements.openPopupBtn, page.actions.openPopup);
   }
+
+  // Filter panel
+  setText(document.getElementById('toggleFiltersLabel'), page.controls?.filters || 'Filters');
   setText(document.getElementById('lblSearchRegex'), page.search?.regex);
   setText(document.getElementById('lblSearchFields'), page.search?.fields);
   setText(document.getElementById('lblSearchValues'), page.search?.values);
@@ -2095,11 +2325,12 @@ function applyTranslations() {
     elements.aiAssistBtn.textContent = t.buttons.aiAssistBtn;
     elements.optimizeBtn.textContent = t.buttons.optimizeBtn;
     elements.variablesBtn.textContent = t.buttons.variablesBtn;
-    elements.selectModeBtn.textContent = t.buttons.selectModeBtn;
     elements.addRuleBtn.textContent = t.buttons.addRuleBtn;
   }
   if (elements.bulkEnable && t.buttons) elements.bulkEnable.textContent = t.buttons.bulkEnable || 'Enable';
   if (elements.bulkDisable && t.buttons) elements.bulkDisable.textContent = t.buttons.bulkDisable || 'Disable';
+  if (elements.bulkMoveBtn && t.buttons) elements.bulkMoveBtn.textContent = t.buttons.bulkMove || 'Move to profile';
+  if (elements.bulkExport && t.buttons) elements.bulkExport.textContent = t.buttons.bulkExport || 'Export';
   if (elements.bulkDelete && t.buttons) elements.bulkDelete.textContent = t.buttons.bulkDelete || 'Delete';
   if (elements.exitSelectMode && t.buttons) elements.exitSelectMode.textContent = t.buttons.bulkCancel || 'Cancel';
 

@@ -1,12 +1,108 @@
 /**
  * Storage API Wrapper for AutoFill Plugin
- * Håndterer all interaksjon med chrome.storage.local
+ * Håndterer all interaksjon med chrome.storage.local og chrome.storage.sync
  */
 
 const Storage = {
   STORAGE_KEY: 'autofill_rules',
   SYNC_KEY: 'autofill_rules_sync',
   PROFILES_KEY: 'autofill_profiles',
+
+  // Settings that sync across Chrome profiles
+  SYNC_SETTINGS_KEYS: [
+    'autofillEnabled',
+    'autofillDelay',
+    'autofillTrigger',
+    'blacklist',
+    'whitelist',
+    'fieldBlacklist',
+    'notificationsEnabled',
+    'scanToastEnabled',
+    'language',
+    'userVariables',
+    'debugMode'
+  ],
+
+  /**
+   * Get settings (from sync storage)
+   */
+  async getSettings() {
+    try {
+      const result = await chrome.storage.sync.get(this.SYNC_SETTINGS_KEYS);
+      return result;
+    } catch (error) {
+      console.error('Error fetching settings from sync:', error);
+      // Fallback to local storage
+      return await chrome.storage.local.get(this.SYNC_SETTINGS_KEYS);
+    }
+  },
+
+  /**
+   * Save settings (to sync storage)
+   */
+  async saveSettings(settings) {
+    try {
+      // Filter only valid settings keys
+      const validSettings = {};
+      for (const key of this.SYNC_SETTINGS_KEYS) {
+        if (key in settings) {
+          validSettings[key] = settings[key];
+        }
+      }
+      await chrome.storage.sync.set(validSettings);
+      return true;
+    } catch (error) {
+      console.error('Error saving settings to sync:', error);
+      // Fallback to local storage
+      await chrome.storage.local.set(settings);
+      return false;
+    }
+  },
+
+  /**
+   * Migrate settings from local to sync storage (one-time migration)
+   */
+  async migrateSettingsToSync() {
+    try {
+      const migrated = await chrome.storage.local.get('_settingsMigrated');
+      if (migrated._settingsMigrated) return false;
+
+      const localSettings = await chrome.storage.local.get(this.SYNC_SETTINGS_KEYS);
+      const hasSettings = Object.keys(localSettings).some(k => localSettings[k] !== undefined);
+
+      if (hasSettings) {
+        await chrome.storage.sync.set(localSettings);
+        console.log('Settings migrated to sync storage');
+      }
+
+      await chrome.storage.local.set({ _settingsMigrated: true });
+      return true;
+    } catch (error) {
+      console.error('Error migrating settings:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Export all settings to JSON
+   */
+  async exportSettings() {
+    const settings = await this.getSettings();
+    return JSON.stringify(settings, null, 2);
+  },
+
+  /**
+   * Import settings from JSON
+   */
+  async importSettings(jsonString) {
+    try {
+      const settings = JSON.parse(jsonString);
+      await this.saveSettings(settings);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
 
   /**
    * Henter alle profiler
@@ -233,8 +329,9 @@ const Storage = {
 
     const matched = rules.filter(rule => {
       if (!rule.enabled) return false;
-      const ruleProfile = rule.profileId || 'default';
-      
+      // Treat rules without profileId (or empty string) as belonging to 'default'
+      const ruleProfile = (typeof rule.profileId === 'string' && rule.profileId.trim()) || 'default';
+
       // Check profile status
       if (profileId) {
           // When a specific profile is requested, match that profile (treat missing as default)

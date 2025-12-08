@@ -7,7 +7,8 @@
 let allRules = [];
 let pageRules = [];
 let userVariables = {}; // Ny global for variabler
-let currentProfileId = 'default'; // Ny global for profiler
+let currentProfileId = 'default'; // Active profile for autofill
+let viewingProfileId = 'default'; // Profile being viewed in popup (explore mode)
 let filteredRules = [];
 let currentTab = null;
 let editingRuleId = null;
@@ -215,7 +216,6 @@ function applyTranslations() {
   if (elements.settingsTitle && t.settingsPanel?.title) {
     elements.settingsTitle.textContent = t.settingsPanel.title;
   }
-  updateAdvancedToggleLabel();
 
   if (t.cloud) {
     if (elements.cloudBackupLabel) elements.cloudBackupLabel.textContent = t.cloud.title;
@@ -288,7 +288,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === 'setCurrentProfile' && request.profileId) {
     currentProfileId = request.profileId;
+    viewingProfileId = request.profileId; // Sync viewing profile
     if (elements.profileSelect) elements.profileSelect.value = currentProfileId;
+    updateSetActiveButton();
     loadRules();
   }
 });
@@ -352,15 +354,15 @@ function initElements() {
 
   elements.suggestionsList = document.getElementById('suggestionsList');
   elements.openFullViewBtn = document.getElementById('openFullViewBtn');
+  elements.openSettingsBtn = document.getElementById('openSettingsBtn');
   elements.testMatchBtn = document.getElementById('testMatchBtn');
   elements.aiAssistBtn = document.getElementById('aiAssistBtn');
-  elements.toggleAdvancedSettings = document.getElementById('toggleAdvancedSettings');
-  elements.advancedSettings = document.getElementById('advancedSettings');
   elements.basicSettings = document.getElementById('basicSettings');
   elements.settingsTitle = document.getElementById('settingsTitle');
 
   // Profiler
   elements.profileSelect = document.getElementById('profileSelect');
+  elements.setActiveProfileBtn = document.getElementById('setActiveProfileBtn');
   elements.manageProfilesBtn = document.getElementById('manageProfilesBtn');
   elements.profilesModal = document.getElementById('profilesModal');
   elements.closeProfilesModal = document.getElementById('closeProfilesModal');
@@ -385,25 +387,11 @@ function initElements() {
   elements.fieldTypeInput = document.getElementById('fieldType');
   elements.fieldUseRegex = document.getElementById('fieldUseRegex');
 
-  // Settings toggles
+  // Settings toggles (basic settings still in popup)
   elements.autofillToggle = document.getElementById('autofillToggle');
-  elements.debugToggle = document.getElementById('debugToggle');
   elements.scanToastToggle = document.getElementById('scanToastToggle');
-  elements.autofillDelay = document.getElementById('autofillDelay');
-  elements.autofillMode = document.getElementById('autofillMode');
-  elements.blacklistPatterns = document.getElementById('blacklistPatterns');
-  elements.fieldBlacklistPatterns = document.getElementById('fieldBlacklistPatterns');
-  elements.whitelistPatterns = document.getElementById('whitelistPatterns');
   elements.languageSelect = document.getElementById('languageSelect');
-  elements.logToFileToggle = document.getElementById('logToFileToggle');
-  elements.exportLogBtn = document.getElementById('exportLogBtn');
-  elements.pushSyncBtn = document.getElementById('pushSyncBtn');
-  elements.pullSyncBtn = document.getElementById('pullSyncBtn');
-  elements.cloudBackupBtn = document.getElementById('cloudBackupBtn');
-  elements.cloudRestoreBtn = document.getElementById('cloudRestoreBtn');
-  elements.cloudBackupLabel = document.getElementById('cloudBackupLabel');
-  elements.cloudBackupDesc = document.getElementById('cloudBackupDesc');
-  elements.settingsAccordion = document.querySelector('.settings-accordion');
+  elements.settingsFileInput = document.getElementById('settingsFileInput');
   elements.importPreviewModal = document.getElementById('importPreviewModal');
   elements.importPreviewTitle = document.getElementById('importPreviewTitle');
   elements.importPreviewSummary = document.getElementById('importPreviewSummary');
@@ -447,22 +435,6 @@ function initAccordion(header, content) {
   });
 }
 
-function toggleAdvancedSettingsPanel() {
-  if (!elements.advancedSettings || !elements.toggleAdvancedSettings) return;
-  elements.advancedSettings.classList.toggle('collapsed');
-  updateAdvancedToggleLabel();
-}
-
-function updateAdvancedToggleLabel() {
-  const t = translations.current || translations.en;
-  if (!elements.toggleAdvancedSettings) return;
-  const collapsed = elements.advancedSettings?.classList.contains('collapsed');
-  elements.toggleAdvancedSettings.dataset.collapsed = collapsed ? 'true' : 'false';
-  elements.toggleAdvancedSettings.textContent = collapsed
-    ? (t.settingsPanel?.showAdvanced || 'More settings')
-    : (t.settingsPanel?.hideAdvanced || 'Hide advanced');
-}
-
 /**
  * Legg til event listeners
  */
@@ -491,6 +463,9 @@ function attachEventListeners() {
   }
   if (elements.openFullViewBtn) {
     elements.openFullViewBtn.addEventListener('click', openFullView);
+  }
+  if (elements.openSettingsBtn) {
+    elements.openSettingsBtn.addEventListener('click', () => SettingsModal.open());
   }
   if (elements.testMatchBtn) {
     elements.testMatchBtn.addEventListener('click', handleTestMatch);
@@ -521,9 +496,6 @@ function attachEventListeners() {
           }
       });
   }
-  if (elements.toggleAdvancedSettings) {
-    elements.toggleAdvancedSettings.addEventListener('click', toggleAdvancedSettingsPanel);
-  }
   if (elements.settingsAccordion) {
     elements.settingsAccordion.addEventListener('toggle', () => {
       const open = elements.settingsAccordion.hasAttribute('open');
@@ -533,6 +505,7 @@ function attachEventListeners() {
 
   // Profiler
   if (elements.profileSelect) elements.profileSelect.addEventListener('change', handleProfileChange);
+  if (elements.setActiveProfileBtn) elements.setActiveProfileBtn.addEventListener('click', handleSetActiveProfile);
   if (elements.manageProfilesBtn) elements.manageProfilesBtn.addEventListener('click', openProfilesModal);
   if (elements.closeProfilesModal) elements.closeProfilesModal.addEventListener('click', closeProfilesModal);
   if (elements.addProfileForm) elements.addProfileForm.addEventListener('submit', handleAddProfile);
@@ -579,34 +552,13 @@ function attachEventListeners() {
   // Optimizer
   elements.closeOptimizer.addEventListener('click', hideOptimizer);
 
-  // Settings
+  // Settings (basic settings in popup, advanced in settings modal)
   elements.autofillToggle.addEventListener('change', handleAutofillToggle);
-  elements.debugToggle.addEventListener('change', handleDebugToggle);
   elements.scanToastToggle.addEventListener('change', handleScanToastToggle);
   elements.fieldTypeInput.addEventListener('change', handleFieldTypeChange);
-  elements.autofillDelay.addEventListener('change', handleAutofillDelayChange);
-  elements.autofillMode.addEventListener('change', handleAutofillModeChange);
-  if (elements.blacklistPatterns) elements.blacklistPatterns.addEventListener('change', handleListChange);
-  if (elements.fieldBlacklistPatterns) elements.fieldBlacklistPatterns.addEventListener('change', handleListChange);
-  if (elements.whitelistPatterns) elements.whitelistPatterns.addEventListener('change', handleListChange);
-  
-  if (elements.logToFileToggle) {
-    elements.logToFileToggle.addEventListener('change', handleLogToggle);
-  }
-  if (elements.exportLogBtn) {
-    elements.exportLogBtn.addEventListener('click', handleExportLog);
-  }
-  if (elements.pushSyncBtn) {
-    elements.pushSyncBtn.addEventListener('click', handlePushSync);
-  }
-  if (elements.pullSyncBtn) {
-    elements.pullSyncBtn.addEventListener('click', handlePullSync);
-  }
-  if (elements.cloudBackupBtn) {
-    elements.cloudBackupBtn.addEventListener('click', handleCloudBackup);
-  }
-  if (elements.cloudRestoreBtn) {
-    elements.cloudRestoreBtn.addEventListener('click', handleLocalRestore);
+
+  if (elements.settingsFileInput) {
+    elements.settingsFileInput.addEventListener('change', handleImportSettings);
   }
 
   // Tilgjengelige felt
@@ -639,42 +591,57 @@ function attachEventListeners() {
 }
 
 /**
+ * Hent innstillinger fra sync storage (fallback til local)
+ */
+async function getSyncSettings(keys) {
+  try {
+    return await chrome.storage.sync.get(keys);
+  } catch (e) {
+    return await chrome.storage.local.get(keys);
+  }
+}
+
+/**
+ * Lagre innstillinger til sync storage (fallback til local)
+ */
+async function saveSyncSettings(data) {
+  try {
+    await chrome.storage.sync.set(data);
+  } catch (e) {
+    await chrome.storage.local.set(data);
+  }
+}
+
+/**
  * Last inn innstillinger
  */
 async function loadSettings() {
   try {
-    const result = await chrome.storage.local.get(['debugMode', 'autofillEnabled', 'scanToastEnabled', 'autofillDelay', 'autofillTrigger', 'blacklist', 'whitelist', 'language', 'fieldBlacklist', 'logToFile', LOG_KEY]);
+    // Sync settings (shared across Chrome profiles)
+    const syncKeys = ['debugMode', 'autofillEnabled', 'scanToastEnabled', 'autofillDelay', 'autofillTrigger', 'blacklist', 'whitelist', 'fieldBlacklist', 'language'];
+    const syncResult = await getSyncSettings(syncKeys);
 
-    // Sett toggle states
-    elements.debugToggle.checked = result.debugMode || false;
-    elements.scanToastToggle.checked = result.scanToastEnabled !== false; // Default true
-    elements.autofillToggle.checked = result.autofillEnabled !== false; // Default true
-  elements.autofillDelay.value = result.autofillDelay || 0;
-  elements.autofillMode.value = result.autofillTrigger || 'auto';
-  logEnabled = !!result.logToFile;
-  if (elements.logToFileToggle) elements.logToFileToggle.checked = logEnabled;
-  logBuffer = Array.isArray(result[LOG_KEY]) ? result[LOG_KEY] : [];
-  if (elements.blacklistPatterns) {
-    elements.blacklistPatterns.value = Array.isArray(result.blacklist) ? result.blacklist.join('\n') : '';
+    // Local-only settings (profile-specific)
+    const localResult = await chrome.storage.local.get(['logToFile', LOG_KEY]);
+
+    // Sett toggle states (basic settings only - advanced are in settings modal)
+    elements.scanToastToggle.checked = syncResult.scanToastEnabled !== false; // Default true
+    elements.autofillToggle.checked = syncResult.autofillEnabled !== false; // Default true
+    logEnabled = !!localResult.logToFile;
+    logBuffer = Array.isArray(localResult[LOG_KEY]) ? localResult[LOG_KEY] : [];
+  } catch (error) {
+    console.error('Error loading settings:', error);
   }
-  if (elements.fieldBlacklistPatterns) {
-    elements.fieldBlacklistPatterns.value = Array.isArray(result.fieldBlacklist) ? result.fieldBlacklist.join('\n') : '';
-  }
-      if (elements.whitelistPatterns) {
-      elements.whitelistPatterns.value = Array.isArray(result.whitelist) ? result.whitelist.join('\n') : '';
-    }
-      
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  }
-  async function loadCurrentProfileId() {
+}
+async function loadCurrentProfileId() {
   try {
     const res = await chrome.storage.local.get('currentProfileId');
     if (res.currentProfileId) {
       currentProfileId = res.currentProfileId;
+      viewingProfileId = res.currentProfileId; // Start viewing the active profile
       if (elements.profileSelect) elements.profileSelect.value = currentProfileId;
     }
+    updateSetActiveButton();
   } catch (e) {
     console.error('Error loading current profile', e);
   }
@@ -709,8 +676,8 @@ async function handleAutofillToggle(e) {
   const enabled = e.target.checked;
 
   try {
-    // Lagre innstilling
-    await chrome.storage.local.set({ autofillEnabled: enabled });
+    // Lagre innstilling til sync storage
+    await saveSyncSettings({ autofillEnabled: enabled });
 
     // Oppdater badge
     await chrome.runtime.sendMessage({
@@ -746,8 +713,8 @@ async function handleDebugToggle(e) {
   const enabled = e.target.checked;
 
   try {
-    // Lagre innstilling
-    await chrome.storage.local.set({ debugMode: enabled });
+    // Lagre innstilling til sync storage
+    await saveSyncSettings({ debugMode: enabled });
 
     // Notifiser alle tabs
     const tabs = await chrome.tabs.query({});
@@ -777,8 +744,8 @@ async function handleScanToastToggle(e) {
   const enabled = e.target.checked;
 
   try {
-    // Lagre innstilling
-    await chrome.storage.local.set({ scanToastEnabled: enabled });
+    // Lagre innstilling til sync storage
+    await saveSyncSettings({ scanToastEnabled: enabled });
 
     // Notifiser alle tabs
     const tabs = await chrome.tabs.query({});
@@ -807,7 +774,7 @@ async function handleScanToastToggle(e) {
 async function handleAutofillDelayChange(e) {
   const delay = parseInt(e.target.value) || 0;
   try {
-    await chrome.storage.local.set({ autofillDelay: delay });
+    await saveSyncSettings({ autofillDelay: delay });
     broadcastSettings({ autofillDelay: delay });
     
     // Vis toast
@@ -824,7 +791,7 @@ async function handleAutofillDelayChange(e) {
 async function handleAutofillModeChange(e) {
   const mode = e.target.value;
   try {
-    await chrome.storage.local.set({ autofillTrigger: mode });
+    await saveSyncSettings({ autofillTrigger: mode });
     broadcastSettings({ autofillTrigger: mode });
     
     // Vis toast
@@ -854,7 +821,7 @@ async function handleListChange() {
       .map(s => s.trim())
       .filter(Boolean);
 
-    await chrome.storage.local.set({ blacklist, whitelist, fieldBlacklist });
+    await saveSyncSettings({ blacklist, whitelist, fieldBlacklist });
     broadcastSettings({ blacklist, whitelist, fieldBlacklist });
     
     // Vis toast
@@ -927,7 +894,7 @@ async function handleBulkMoveSubmit(e) {
  */
 async function loadVariables() {
     try {
-        const res = await chrome.storage.local.get('userVariables');
+        const res = await getSyncSettings(['userVariables']);
         userVariables = res.userVariables || {};
     } catch (e) {
         console.error("Error loading variables", e);
@@ -998,9 +965,9 @@ async function handleAddVariable(e) {
     if (!key || !value) return;
 
     userVariables[key] = value;
-    
+
     try {
-        await chrome.storage.local.set({ userVariables });
+        await saveSyncSettings({ userVariables });
         // Notifiser tabs om oppdatering
         broadcastSettings({ userVariables });
         renderVariables();
@@ -1017,7 +984,7 @@ async function handleDeleteVariable(key) {
     
     delete userVariables[key];
     try {
-        await chrome.storage.local.set({ userVariables });
+        await saveSyncSettings({ userVariables });
         broadcastSettings({ userVariables });
         renderVariables();
     } catch (e) {
@@ -1043,20 +1010,20 @@ async function loadProfiles() {
 
 function renderProfileSelector(profiles) {
     if (!elements.profileSelect) return;
-    
+
     const t = translations.current || translations.en;
     elements.profileSelect.innerHTML = '';
-    
-    // Option for "All profiles" could be added here if desired, but for now strictly per profile
-    // profiles.forEach...
-    
+
     for (const p of profiles) {
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = p.name;
-        if (p.id === currentProfileId) opt.selected = true;
+        // Show checkmark for active profile
+        const isActive = p.id === currentProfileId;
+        opt.textContent = isActive ? `✓ ${p.name}` : `   ${p.name}`;
+        if (p.id === viewingProfileId) opt.selected = true;
         elements.profileSelect.appendChild(opt);
     }
+    updateSetActiveButton();
 }
 
 function renderProfilesList(profiles) {
@@ -1093,14 +1060,36 @@ function renderProfilesList(profiles) {
 }
 
 async function handleProfileChange(e) {
-    currentProfileId = e.target.value;
-    try {
-      await chrome.storage.local.set({ currentProfileId });
-      chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId: currentProfileId });
-    } catch (err) {
-      console.error('Could not persist profile selection', err);
-    }
+    // Explore mode: only change viewing profile, not active profile
+    viewingProfileId = e.target.value;
+    updateSetActiveButton();
     await loadRules(); // Reload rules with new filter
+}
+
+function updateSetActiveButton() {
+    if (!elements.setActiveProfileBtn) return;
+    // Show "Set as active" button when viewing a different profile than active
+    if (viewingProfileId !== currentProfileId) {
+        elements.setActiveProfileBtn.style.display = 'inline-block';
+    } else {
+        elements.setActiveProfileBtn.style.display = 'none';
+    }
+}
+
+async function handleSetActiveProfile() {
+    // Set the currently viewed profile as the active profile
+    currentProfileId = viewingProfileId;
+    try {
+        await chrome.storage.local.set({ currentProfileId });
+        chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId: currentProfileId }).catch(() => {});
+        // Refresh context menu to update checkmark
+        chrome.runtime.sendMessage({ action: 'refreshContextMenus' }).catch(() => {});
+        updateSetActiveButton();
+        const t = translations.current || translations.en;
+        showToast(t.toast?.profileActivated || 'Profile activated');
+    } catch (err) {
+        console.error('Could not set active profile', err);
+    }
 }
 
 function openProfilesModal() {
@@ -1156,32 +1145,38 @@ async function handleDeleteProfile(id, name) {
 
 async function handlePushSync() {
   const btn = elements.pushSyncBtn;
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '...';
-  
+  const originalText = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '...';
+  }
+
   try {
     const res = await Storage.pushToSync();
     alert(`Synkronisert ${res.count} regler til skyen.`);
   } catch (e) {
     alert('Feil ved synkronisering: ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 }
 
 async function handlePullSync() {
   const btn = elements.pullSyncBtn;
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '...';
-  
+  const originalText = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '...';
+  }
+
   try {
     // Hent remote regler først
     const result = await chrome.storage.sync.get('autofill_rules_sync');
     const remoteRules = result['autofill_rules_sync'] || [];
-    
+
     if (remoteRules.length === 0) {
         alert('Ingen regler funnet i skyen.');
         return;
@@ -1190,9 +1185,9 @@ async function handlePullSync() {
     // Lag modal for valg
     const choice = prompt(
         `Fant ${remoteRules.length} regler i skyen.\n\n` +
-        `Velg handling:\n` + 
+        `Velg handling:\n` +
         `1. Overskriv (Sletter lokale regler og erstatter med sky-regler)\n` +
-        `2. Merge (Legger til nye regler, beholder lokale ved konflikt)\n` + 
+        `2. Merge (Legger til nye regler, beholder lokale ved konflikt)\n` +
         `3. Smart Merge (Legger til nye, og beholder BEGGE ved konflikt - duplikatvarsel)`
     , "3");
 
@@ -1215,7 +1210,7 @@ async function handlePullSync() {
                 const lRule = localMap.get(rRule.id);
                 // Sjekk om innhold er likt
                 const isIdentical = JSON.stringify(lRule) === JSON.stringify(rRule);
-                
+
                 if (!isIdentical) {
                     if (choice === '3') {
                         // Smart merge: Behold begge (ny ID for remote)
@@ -1241,8 +1236,59 @@ async function handlePullSync() {
     console.error(e);
     alert('Feil ved henting: ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+}
+
+/**
+ * Export settings to JSON file
+ */
+async function handleExportSettings() {
+  try {
+    const settingsJson = await Storage.exportSettings();
+    const blob = new Blob([settingsJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `autofill-settings-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(translations.current?.toast?.exported || 'Settings exported');
+  } catch (e) {
+    console.error('Export settings error:', e);
+    alert('Error exporting settings: ' + e.message);
+  }
+}
+
+/**
+ * Import settings from JSON file
+ */
+async function handleImportSettings(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const result = await Storage.importSettings(text);
+
+    if (result.success) {
+      showToast(translations.current?.toast?.imported || 'Settings imported');
+      // Reload settings to update UI
+      await loadSettings();
+      await loadVariables();
+      broadcastSettings(JSON.parse(text));
+    } else {
+      alert('Import error: ' + result.error);
+    }
+  } catch (e) {
+    console.error('Import settings error:', e);
+    alert('Error importing settings: ' + e.message);
+  } finally {
+    // Reset file input
+    e.target.value = '';
   }
 }
 
@@ -1396,10 +1442,12 @@ async function loadPageRules() {
 
   try {
     // Hent regler som matcher dette nettstedet
+    // Use viewingProfileId for explore mode
+    const profileForQuery = viewingProfileId || currentProfileId || 'default';
     const response = await chrome.runtime.sendMessage({
       action: 'getRulesForSite',
       url: currentTab.url,
-      profileId: (currentProfileId && currentProfileId !== 'default') ? currentProfileId : null
+      profileId: profileForQuery
     });
     const siteRules = response?.rules || [];
     // Sett foreløpig liste slik at tellerne ikke står på 0 mens vi scanner
@@ -1627,7 +1675,11 @@ function applyFilters() {
   const sourceRules = pageRules || [];
 
   filteredRules = sourceRules.filter(rule => {
-    if (currentProfileId && rule.profileId && rule.profileId !== currentProfileId) return false;
+    // Use viewingProfileId for explore mode
+    const profileFilter = viewingProfileId || currentProfileId || 'default';
+    // Treat rules without profileId (or empty string) as belonging to 'default'
+    const ruleProfile = (typeof rule.profileId === 'string' && rule.profileId.trim()) || 'default';
+    if (ruleProfile !== profileFilter) return false;
 
     // Enabled filter
     if (onlyEnabled && !rule.enabled) return false;
@@ -2338,7 +2390,15 @@ async function applySuggestion(suggestion) {
  * Oppdater statistikk
  */
 function updateStats() {
-  const profileRules = allRules.filter(r => !currentProfileId || r.profileId === currentProfileId);
+  // Use viewingProfileId for explore mode
+  const profileFilter = viewingProfileId || currentProfileId || 'default';
+
+  // Treat rules without profileId (or empty string) as belonging to 'default'
+  const profileRules = allRules.filter(r => {
+    const ruleProfile = (typeof r.profileId === 'string' && r.profileId.trim()) || 'default';
+    return ruleProfile === profileFilter;
+  });
+
   elements.totalRules.textContent = profileRules.length;
   elements.activeRules.textContent = profileRules.filter(r => r.enabled).length;
   elements.currentSiteRules.textContent = pageRules.length;

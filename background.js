@@ -6,12 +6,14 @@
 // Importer nødvendige moduler
 importScripts('utils.js', 'storage.js', 'pattern-matcher.js', 'rule-optimizer.js', 'translations.js', 'cloud.js');
 
-// Aktiver debug-logging basert på storage
-chrome.storage.local.get(['debugMode']).then(result => {
-  if (result.debugMode) {
+// Migrate settings to sync storage and enable debug if needed
+(async () => {
+  await Storage.migrateSettingsToSync();
+  const settings = await Storage.getSettings();
+  if (settings.debugMode) {
     Logger.enableDebug();
   }
-});
+})();
 
 const CONTEXT_MENU_SET_PROFILE_PARENT = 'autofill_set_profile_parent';
 const CONTEXT_MENU_SET_PROFILE_PREFIX = 'autofill_set_profile_';
@@ -108,6 +110,8 @@ async function updateBadge(autofillEnabled) {
  */
 async function createContextMenus() {
   const profiles = await Storage.getProfiles();
+  const { currentProfileId } = await chrome.storage.local.get('currentProfileId');
+  const activeProfileId = currentProfileId || 'default';
   const t = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS.current) || TRANSLATIONS?.en || {};
   const cm = t.contextMenu || {};
 
@@ -129,19 +133,19 @@ async function createContextMenus() {
 
     // Fyll ut som profil (Parent)
     chrome.contextMenus.create({
-        id: 'autofill_fill_as_parent',
-        title: cm.fillAs || 'Fyll ut som...', 
-        contexts: ['page', 'editable']
+      id: 'autofill_fill_as_parent',
+      title: cm.fillAs || 'Fyll ut som...',
+      contexts: ['page', 'editable']
     });
 
     // Profiler (Children)
     profiles.forEach(p => {
-        chrome.contextMenus.create({
-            id: `autofill_profile_${p.id}`,
-            parentId: 'autofill_fill_as_parent',
-            title: p.name,
-            contexts: ['page', 'editable']
-        });
+      chrome.contextMenus.create({
+        id: `autofill_profile_${p.id}`,
+        parentId: 'autofill_fill_as_parent',
+        title: p.name,
+        contexts: ['page', 'editable']
+      });
     });
 
     // Sett aktiv profil (Parent)
@@ -151,10 +155,12 @@ async function createContextMenus() {
       contexts: ['page', 'editable']
     });
     profiles.forEach(p => {
+      // Add checkmark to active profile
+      const isActive = p.id === activeProfileId;
       chrome.contextMenus.create({
         id: `${CONTEXT_MENU_SET_PROFILE_PREFIX}${p.id}`,
         parentId: CONTEXT_MENU_SET_PROFILE_PARENT,
-        title: p.name,
+        title: isActive ? `✓ ${p.name}` : `   ${p.name}`,
         contexts: ['page', 'editable']
       });
     });
@@ -178,7 +184,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } else if (info.menuItemId.startsWith(CONTEXT_MENU_SET_PROFILE_PREFIX)) {
       const profileId = info.menuItemId.replace(CONTEXT_MENU_SET_PROFILE_PREFIX, '');
       await chrome.storage.local.set({ currentProfileId: profileId });
-      chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId });
+      // Notify popup/rules if open (ignore error if not)
+      chrome.runtime.sendMessage({ action: 'setCurrentProfile', profileId }).catch(() => {});
+      // Refresh context menu to update checkmark
+      await createContextMenus();
   }
 });
 

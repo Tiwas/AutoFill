@@ -14,6 +14,7 @@
         <h1 id="appTitle">AutoFill</h1>
         <div class="profile-selector-container">
             <select id="profileSelect" class="profile-select"></select>
+            <button id="setActiveProfileBtn" class="btn btn-small btn-primary" title="Set as active profile" style="display: none;">✓ Set active</button>
             <button id="manageProfilesBtn" class="btn-icon-small" title="Manage profiles" aria-label="Manage profiles">⚙️</button>
         </div>
       </div>
@@ -30,8 +31,8 @@
         <button id="importBtn" class="btn btn-secondary" title="Import rules from CSV">
           <span id="btnImportLabel">Import</span>
         </button>
-        <button id="validateBtn" class="btn btn-secondary" title="Validate rules from CSV">
-          <span id="btnValidateLabel">Validate</span>
+        <button id="openSettingsBtn" class="btn btn-icon" title="Settings">
+          <span>⚙</span>
         </button>
       </div>
     </header>
@@ -88,7 +89,6 @@
     <div class="settings-section">
       <div class="settings-header">
         <h3 id="settingsTitle">Settings</h3>
-        <button id="toggleAdvancedSettings" class="btn btn-small btn-secondary">More settings</button>
       </div>
 
       <div class="settings-group" id="basicSettings">
@@ -123,98 +123,6 @@
             <input type="checkbox" id="scanToastToggle" checked />
             <span class="toggle-slider"></span>
           </label>
-        </div>
-      </div>
-
-      <div class="settings-group collapsible collapsed" id="advancedSettings">
-        <div class="settings-accordion-content">
-        <div class="setting-item" data-setting="debug">
-          <div class="setting-info">
-            <span class="setting-label">Debug mode</span>
-            <span class="setting-description">Detailed logging and visual feedback</span>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="debugToggle" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="setting-item" data-setting="logToFile">
-          <div class="setting-info">
-            <span class="setting-label">Local debug log</span>
-            <span class="setting-description">Store debug log locally; export when needed</span>
-          </div>
-          <div class="setting-actions">
-            <label class="toggle-switch">
-              <input type="checkbox" id="logToFileToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-            <button class="btn btn-small btn-secondary" id="exportLogBtn" type="button">Export log</button>
-          </div>
-        </div>
-        <div class="setting-item" data-setting="delay">
-          <div class="setting-info">
-            <span class="setting-label">Autofill delay (ms)</span>
-            <span class="setting-description">Delay filling on slow pages</span>
-          </div>
-          <input type="number" id="autofillDelay" min="0" value="0" />
-        </div>
-        <div class="setting-item" data-setting="mode">
-          <div class="setting-info">
-            <span class="setting-label">Autofill mode</span>
-            <span class="setting-description">Auto on load or after interaction</span>
-          </div>
-          <select id="autofillMode">
-            <option value="auto">Automatic on load</option>
-            <option value="interaction">On interaction only</option>
-          </select>
-        </div>
-        <div class="setting-item" data-setting="whitelist">
-          <div class="setting-info">
-            <span class="setting-label">Whitelist</span>
-            <span class="setting-description">One pattern per line. Blank = allow all.</span>
-          </div>
-          <textarea id="whitelistPatterns" rows="2" placeholder="example.com"></textarea>
-        </div>
-        <div class="setting-item" data-setting="blacklist">
-          <div class="setting-info">
-            <span class="setting-label">Blacklist (URL/Host)</span>
-            <span class="setting-description">Overrides whitelist. One pattern per line.</span>
-          </div>
-          <textarea id="blacklistPatterns" rows="2" placeholder="*.bank.com"></textarea>
-        </div>
-        <div class="setting-item" data-setting="fieldBlacklist">
-          <div class="setting-info">
-            <span class="setting-label">Ignored Fields (ID)</span>
-            <span class="setting-description">Avoid autofill for these IDs. Wildcard or regex: prefix.</span>
-          </div>
-          <textarea id="fieldBlacklistPatterns" rows="2" placeholder="g-recaptcha-response&#10;tracking-*&#10;regex:^field\d+$"></textarea>
-        </div>
-        <div class="setting-item" data-setting="sync">
-          <div class="setting-info">
-            <span class="setting-label">Cloud Sync</span>
-            <span class="setting-description">Manual push/pull via storage.sync</span>
-          </div>
-          <div style="display:flex; gap:5px;">
-            <button id="pushSyncBtn" class="btn btn-small btn-secondary">Push</button>
-            <button id="pullSyncBtn" class="btn btn-small btn-secondary">Pull</button>
-          </div>
-        </div>
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-label" id="cloudBackupLabel"></span>
-            <span class="setting-description" id="cloudBackupDesc"></span>
-          </div>
-          <div style="display:flex; gap:6px; flex-wrap: wrap;">
-            <button id="cloudBackupBtn" class="btn btn-small btn-secondary"></button>
-            <button id="cloudRestoreBtn" class="btn btn-small btn-secondary"></button>
-          </div>
-          <div class="cloud-config">
-            <label class="checkbox-label">
-              <input type="checkbox" id="useDefaultBackupDir" />
-              <span id="useDefaultBackupDirLabel"></span>
-            </label>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -538,10 +446,179 @@
   <input type="file" id="fileInput" accept=".csv" style="display: none;" />
   <input type="file" id="validateFileInput" accept=".csv" style="display: none;" />
 
+  <!-- Settings Modal -->
+  <div class="modal settings-modal" id="settingsModal" style="display: none;">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2 id="settingsModalTitle">Settings</h2>
+        <button class="close-btn" id="closeSettingsModal">&times;</button>
+      </div>
+      <div class="modal-body settings-modal-body">
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-tab="general">General</button>
+          <button class="settings-tab" data-tab="filters">Filters</button>
+          <button class="settings-tab" data-tab="backup">Backup</button>
+          <button class="settings-tab" data-tab="advanced">Advanced</button>
+        </div>
+
+        <div class="settings-tab-content active" data-tab="general">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Language</span>
+              <span class="setting-description">Select UI language</span>
+            </div>
+            <select id="settingsLanguageSelect">
+              <option value="en">English</option>
+              <option value="no">Norsk</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">AutoFill enabled</span>
+              <span class="setting-description">Toggle autofill globally</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAutofillToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Scan notification</span>
+              <span class="setting-description">Show toast with scan status</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsScanToastToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Autofill delay (ms)</span>
+              <span class="setting-description">Delay filling on slow pages</span>
+            </div>
+            <input type="number" id="settingsAutofillDelay" min="0" value="0" />
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Autofill mode</span>
+              <span class="setting-description">Auto on load or after interaction</span>
+            </div>
+            <select id="settingsAutofillMode">
+              <option value="auto">Automatic on load</option>
+              <option value="interaction">On interaction only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-tab-content" data-tab="filters">
+          <div class="setting-item setting-item-vertical">
+            <div class="setting-info">
+              <span class="setting-label">Whitelist</span>
+              <span class="setting-description">One pattern per line. Blank = allow all.</span>
+            </div>
+            <textarea id="settingsWhitelistPatterns" rows="3" placeholder="example.com"></textarea>
+          </div>
+          <div class="setting-item setting-item-vertical">
+            <div class="setting-info">
+              <span class="setting-label">Blacklist (URL/Host)</span>
+              <span class="setting-description">Overrides whitelist. One pattern per line.</span>
+            </div>
+            <textarea id="settingsBlacklistPatterns" rows="3" placeholder="*.bank.com"></textarea>
+          </div>
+          <div class="setting-item setting-item-vertical">
+            <div class="setting-info">
+              <span class="setting-label">Ignored Fields (ID)</span>
+              <span class="setting-description">Avoid autofill for these IDs.</span>
+            </div>
+            <textarea id="settingsFieldBlacklistPatterns" rows="3" placeholder="g-recaptcha-response"></textarea>
+          </div>
+        </div>
+
+        <div class="settings-tab-content" data-tab="backup">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Export Settings</span>
+              <span class="setting-description">Export all settings to a JSON file</span>
+            </div>
+            <button id="settingsExportBtn" class="btn btn-secondary">Export</button>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Import Settings</span>
+              <span class="setting-description">Import settings from a JSON file</span>
+            </div>
+            <button id="settingsImportBtn" class="btn btn-secondary">Import</button>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Validate Rules File</span>
+              <span class="setting-description">Check a CSV backup file for errors</span>
+            </div>
+            <button id="settingsValidateBtn" class="btn btn-secondary">Validate</button>
+          </div>
+          <hr class="setting-divider" />
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Cloud Sync</span>
+              <span class="setting-description">Manual push/pull via storage.sync</span>
+            </div>
+            <div class="setting-actions">
+              <button id="settingsPushSyncBtn" class="btn btn-small btn-secondary">Push</button>
+              <button id="settingsPullSyncBtn" class="btn btn-small btn-secondary">Pull</button>
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Google Drive Backup</span>
+              <span class="setting-description">Backup and restore rules</span>
+            </div>
+            <div class="setting-actions">
+              <button id="settingsCloudBackupBtn" class="btn btn-small btn-secondary">Backup</button>
+              <button id="settingsCloudRestoreBtn" class="btn btn-small btn-secondary">Restore</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-tab-content" data-tab="advanced">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Debug mode</span>
+              <span class="setting-description">Detailed logging and visual feedback</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsDebugToggle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-label">Local debug log</span>
+              <span class="setting-description">Store debug log locally</span>
+            </div>
+            <div class="setting-actions">
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingsLogToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn btn-small btn-secondary" id="settingsExportLogBtn">Export log</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="closeSettingsModalBtn">Close</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="settingsFileInput" accept=".json" style="display: none;" />
+  <input type="file" id="settingsValidateFileInput" accept=".csv" style="display: none;" />
+
   <script src="translations.js"></script>
   <script src="storage.js"></script>
   <script src="pattern-matcher.js"></script>
   <script src="rule-optimizer.js"></script>
+  <script src="settings-modal.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

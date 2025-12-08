@@ -6,6 +6,12 @@ const { execSync } = require('child_process');
 const DIST_DIR = path.join(__dirname, '../dist'); // For prod builds
 const SRC_DIR = path.join(__dirname, '..'); // Root directory for dev build
 
+// OAuth Client IDs
+const OAUTH_CLIENT_IDS = {
+  dev: '559580217364-3ffl87m1tlg90t19vinvvfdl1cc5mogt.apps.googleusercontent.com',  // Web Application
+  prod: '1051572758888-qjkfmd7in8vmcr9p9ndnf14ec7b6q845.apps.googleusercontent.com' // Chrome Application
+};
+
 const FILES_TO_COPY = [
   'manifest.json', // Manifest is handled specially for dev/prod names
   'background.js',
@@ -31,6 +37,8 @@ function processManifest(manifestPath, env) {
     return;
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+  // Set extension name
   if (env === 'prod') {
     manifest.name = manifest.name.replace(' (DEV)', '');
   } else { // dev
@@ -38,6 +46,13 @@ function processManifest(manifestPath, env) {
       manifest.name += ' (DEV)';
     }
   }
+
+  // Set OAuth client_id for the environment
+  if (manifest.oauth2 && OAUTH_CLIENT_IDS[env]) {
+    manifest.oauth2.client_id = OAUTH_CLIENT_IDS[env];
+    console.log(`Set OAuth client_id for ${env}: ${OAUTH_CLIENT_IDS[env].substring(0, 20)}...`);
+  }
+
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
@@ -55,14 +70,21 @@ function build(env) {
     console.log('Dev build complete (unpacked, not zipped).');
     return; // No copying or zipping for dev
   } else if (env === 'prod') {
-    currentOutDir = path.join(DIST_DIR, 'prod');
+    const preferredOutDir = path.join(DIST_DIR, 'prod');
+    currentOutDir = preferredOutDir;
     isZipping = true;
     
-    // 1. Clean and create output directory
-    if (fs.existsSync(currentOutDir)) {
-      fs.rmSync(currentOutDir, { recursive: true, force: true });
+    // 1. Clean and create output directory (fallback if locked)
+    try {
+      if (fs.existsSync(preferredOutDir)) {
+        fs.rmSync(preferredOutDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(preferredOutDir, { recursive: true });
+    } catch (error) {
+      console.warn(`Warning: Could not clean ${preferredOutDir}: ${error.message}`);
+      currentOutDir = fs.mkdtempSync(path.join(DIST_DIR, 'prod-build-'));
+      fs.mkdirSync(currentOutDir, { recursive: true });
     }
-    fs.mkdirSync(currentOutDir, { recursive: true });
 
     // 2. Copy files
     FILES_TO_COPY.forEach(file => {
@@ -82,17 +104,26 @@ function build(env) {
 
     // 4. Zip the output (only for prod builds, Windows specific using PowerShell)
     if (isZipping) {
-      const zipName = `autofill-plugin-${env}.zip`;
-      const zipPath = path.join(DIST_DIR, zipName);
+      const baseZipName = `autofill-plugin-${env}.zip`;
+      let zipPath = path.join(DIST_DIR, baseZipName);
+      let zipName = baseZipName;
       
       // Ensure DIST_DIR exists for zip
       if (!fs.existsSync(DIST_DIR)) {
         fs.mkdirSync(DIST_DIR);
       }
 
-      // Remove existing zip if it exists
+      // Remove existing zip if it exists, otherwise fall back to a new name
       if (fs.existsSync(zipPath)) {
-        fs.unlinkSync(zipPath);
+        try {
+          fs.unlinkSync(zipPath);
+        } catch (error) {
+          console.warn(`Warning: Could not remove existing zip at ${zipPath}: ${error.message}`);
+          const fallbackName = `autofill-plugin-${env}-${Date.now()}.zip`;
+          zipPath = path.join(DIST_DIR, fallbackName);
+          zipName = fallbackName;
+          console.warn(`Using fallback zip name ${zipName}`);
+        }
       }
 
       console.log(`Creating ${zipName}...`);

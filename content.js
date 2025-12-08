@@ -380,25 +380,37 @@ const MacroPlayer = {
 // --- MACRO RECORDER & PLAYER END ---
 
 /**
- * Last inn innstillinger
+ * Last inn innstillinger fra sync storage (synkroniseres mellom Chrome-profiler)
  */
-  async function loadSettings() {
+async function loadSettings() {
   try {
-    const result = await chrome.storage.local.get(['debugMode', 'autofillEnabled', 'autofillDelay', 'autofillTrigger', 'blacklist', 'whitelist', 'notificationsEnabled', 'scanToastEnabled', 'userVariables', 'language', 'fieldBlacklist']);
-    debugMode = result.debugMode || false;
-    autofillEnabled = result.autofillEnabled !== false; // Default true
-    autofillDelayMs = parseInt(result.autofillDelay) || 0;
-    autofillTrigger = result.autofillTrigger || 'auto';
-    blacklist = Array.isArray(result.blacklist) ? result.blacklist : [];
-    whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
-    fieldBlacklist = Array.isArray(result.fieldBlacklist) ? result.fieldBlacklist : [];
-    // ENDRING: Last inn notification settings
-    notificationsEnabled = result.notificationsEnabled !== false; // Default true
-    scanToastEnabled = result.scanToastEnabled !== false; // Default true
-    userVariables = result.userVariables || {};
-    currentLanguage = result.language || 'en';
-    if (result.currentProfileId) {
-      currentProfileId = result.currentProfileId;
+    // Settings are stored in sync storage, profile-specific data in local
+    const syncKeys = ['debugMode', 'autofillEnabled', 'autofillDelay', 'autofillTrigger', 'blacklist', 'whitelist', 'notificationsEnabled', 'scanToastEnabled', 'userVariables', 'language', 'fieldBlacklist'];
+    const localKeys = ['currentProfileId'];
+
+    let syncResult = {};
+    try {
+      syncResult = await chrome.storage.sync.get(syncKeys);
+    } catch (e) {
+      // Fallback to local if sync fails
+      syncResult = await chrome.storage.local.get(syncKeys);
+    }
+    const localResult = await chrome.storage.local.get(localKeys);
+
+    debugMode = syncResult.debugMode || false;
+    autofillEnabled = syncResult.autofillEnabled !== false; // Default true
+    autofillDelayMs = parseInt(syncResult.autofillDelay) || 0;
+    autofillTrigger = syncResult.autofillTrigger || 'auto';
+    blacklist = Array.isArray(syncResult.blacklist) ? syncResult.blacklist : [];
+    whitelist = Array.isArray(syncResult.whitelist) ? syncResult.whitelist : [];
+    fieldBlacklist = Array.isArray(syncResult.fieldBlacklist) ? syncResult.fieldBlacklist : [];
+    notificationsEnabled = syncResult.notificationsEnabled !== false; // Default true
+    scanToastEnabled = syncResult.scanToastEnabled !== false; // Default true
+    userVariables = syncResult.userVariables || {};
+    currentLanguage = syncResult.language || 'en';
+
+    if (localResult.currentProfileId) {
+      currentProfileId = localResult.currentProfileId;
     }
 
     debugLog('Innstillinger lastet:', { debugMode, autofillEnabled, autofillDelayMs, autofillTrigger, blacklist, whitelist, fieldBlacklist, notificationsEnabled, scanToastEnabled, userVariables, currentLanguage });

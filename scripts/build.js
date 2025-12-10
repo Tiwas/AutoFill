@@ -6,11 +6,8 @@ const { execSync } = require('child_process');
 const DIST_DIR = path.join(__dirname, '../dist'); // For prod builds
 const SRC_DIR = path.join(__dirname, '..'); // Root directory for dev build
 
-// OAuth Client IDs
-const OAUTH_CLIENT_IDS = {
-  dev: '559580217364-3ffl87m1tlg90t19vinvvfdl1cc5mogt.apps.googleusercontent.com',  // Web Application
-  prod: '1051572758888-qjkfmd7in8vmcr9p9ndnf14ec7b6q845.apps.googleusercontent.com' // Chrome Application
-};
+// OAuth Client ID (same for dev and prod) - Chrome App type for chrome.identity.getAuthToken()
+const OAUTH_CLIENT_ID = '559580217364-m0l2k0mt5ioi9ga5ec9fglmfnj8ik730.apps.googleusercontent.com';
 
 const FILES_TO_COPY = [
   'manifest.json', // Manifest is handled specially for dev/prod names
@@ -26,7 +23,10 @@ const FILES_TO_COPY = [
   'translations.js',
   'pattern-matcher.js',
   'rule-optimizer.js',
+  'settings-modal.js',
+  'settings-modal.html',
   'cloud.js',
+  'utils.js',
   'icons', // This is a directory
   '_locales' // This is a directory
 ];
@@ -47,10 +47,9 @@ function processManifest(manifestPath, env) {
     }
   }
 
-  // Set OAuth client_id for the environment
-  if (manifest.oauth2 && OAUTH_CLIENT_IDS[env]) {
-    manifest.oauth2.client_id = OAUTH_CLIENT_IDS[env];
-    console.log(`Set OAuth client_id for ${env}: ${OAUTH_CLIENT_IDS[env].substring(0, 20)}...`);
+  // Set OAuth client_id
+  if (manifest.oauth2) {
+    manifest.oauth2.client_id = OAUTH_CLIENT_ID;
   }
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));

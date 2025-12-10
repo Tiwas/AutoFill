@@ -2513,54 +2513,33 @@ function updateStatus(elementId, text, color) {
 // --- Smart Cloud Logic ---
 
 async function handleSmartBackup() {
-  const configRes = await chrome.runtime.sendMessage({ action: 'getCloudConfig' });
-  const config = configRes.config || {};
-  
-  // Check if Google is "enabled" (has clientId placeholder or real ID)
-  const hasGoogle = config.google && config.google.clientId;
-  
-  if (!hasGoogle) {
-    // No cloud setup, use local
-    handleLocalBackup();
-    return;
-  }
-  
-  // Default to Google
+  // Google Drive is always available (client_id is from manifest.json)
   const provider = 'google';
   const confirmMsg = `Upload backup to Google Drive?`;
   if (!confirm(confirmMsg)) return;
-  
+
   const csv = buildCSV(allRules);
-  
+
   try {
-    const res = await chrome.runtime.sendMessage({ 
-      action: 'cloudBackup', 
-      provider, 
-      csv 
+    const res = await chrome.runtime.sendMessage({
+      action: 'cloudBackup',
+      provider,
+      csv
     });
-    
-    if (res.success) {
+
+    if (res && res.success) {
       alert(`Backup successfully uploaded to Google Drive!\nFile: ${res.fileName}`);
     } else {
-      alert('Backup upload failed: ' + res.error);
+      alert('Backup upload failed: ' + (res?.error || 'No response'));
     }
   } catch (e) {
+    console.error('[handleSmartBackup] Error:', e);
     alert('Error: ' + e.message);
   }
 }
 
 async function handleSmartRestore() {
-  const configRes = await chrome.runtime.sendMessage({ action: 'getCloudConfig' });
-  const config = configRes.config || {};
-  
-  const hasGoogle = config.google && config.google.clientId;
-  
-  if (!hasGoogle) {
-    // No cloud, open local file
-    elements.importFile.click();
-    return;
-  }
-  
+  // Google Drive is always available (client_id is hardcoded in cloud.js)
   const provider = 'google';
   
   elements.cloudRestoreModal.style.display = 'flex';

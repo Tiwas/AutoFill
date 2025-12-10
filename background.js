@@ -634,7 +634,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     Storage.pullFromSync().then(sendResponse);
     return true;
   } else if (request.action === 'cloudBackup') {
-    CloudBackup.uploadBackup(request.provider, request.csv).then(sendResponse);
+    Logger.debug('Background', 'cloudBackup action received, provider:', request.provider);
+    CloudBackup.uploadBackup(request.provider, request.csv)
+      .then(result => {
+        Logger.debug('Background', 'cloudBackup result:', result);
+        sendResponse(result);
+      })
+      .catch(err => {
+        Logger.error('Background', 'cloudBackup error:', err);
+        sendResponse({ success: false, error: err.message });
+      });
     return true;
   } else if (request.action === 'cloudListBackups') {
     CloudBackup.listBackups(request.provider).then(sendResponse);

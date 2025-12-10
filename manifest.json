@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmX7IBAHdZF6P1AnQm/dLZn+cXaJqRvN98pJf37hKzYfpnSIBx2Ge7BOSaiRU4Isd3EczyP2jNZeCKq9dYgj3qLnQIsKLiGy5gInPpajUof5U+9Adu9BNGox6HYK0N9TZn6HWMjdEGSg87NTp8tJIW2WIjfbo+L67ER/Fez9+BYUcRvQQdmmR4fdbDkjrB/EJCmYulsIip813XrwIF1OZlzHrD3OvA8MtKMnwgsLQuUjDSvhGFIL1OGs37Zq7grIrZjXU4XTXjh+v7WmSaRZhjVKAM9eKasJ24RlfXaj7ppXGzYUNoVbJqHH5fBtsv5RKCY1tM4e5ZuQobSGEYEqU8wIDAQAB",
   "name": "AutoFill Plugin (DEV)",
-  "version": "0.9.0",
+  "version": "0.9.12",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
@@ -17,7 +18,7 @@
     "downloads"
   ],
   "oauth2": {
-    "client_id": "559580217364-3ffl87m1tlg90t19vinvvfdl1cc5mogt.apps.googleusercontent.com",
+    "client_id": "559580217364-m0l2k0mt5ioi9ga5ec9fglmfnj8ik730.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/drive.file"
     ]
